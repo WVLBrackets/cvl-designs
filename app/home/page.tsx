@@ -86,18 +86,24 @@ export default async function HomePage({
             </div>
           )}
           
-          <div className="flex items-center justify-center gap-3 mb-4">
-            <h2 className="text-2xl font-bold text-gray-900 text-center">{homePageTitle}</h2>
-            <span className="text-4xl" role="img" aria-label="smiley face">😊</span>
+          <div className="text-center mb-4">
+            <h2 className="text-2xl font-bold text-gray-900">{homePageTitle}</h2>
           </div>
           <p className="text-gray-600 mb-8 text-center">{homePageInstruction}</p>
           
-          <div className="space-y-3">
+          {/* 2x2 Grid of Store Buttons */}
+          <div className="grid grid-cols-2 gap-6">
             {stores.map((store) => {
               const slug = store.slug || ''
               const displayName = store['Display Name'] || store.DisplayName || slug
               const primaryColor = store['Primary Color'] || '#3b82f6'
-              const accentColor = store['Accent Color'] || '#ffffff'
+              const accentColor = store['Accent Color'] || '#1e40af'
+              const headerLogo = store['Header Logo'] || ''
+              const logoSrc = headerLogo
+                ? (headerLogo.startsWith('/') || headerLogo.startsWith('http')
+                    ? headerLogo
+                    : `/images/brand/${headerLogo}`)
+                : '/images/brand/VL Design Logo.png'
               
               if (!slug || slug.toLowerCase() === 'all') return null
               
@@ -105,14 +111,32 @@ export default async function HomePage({
                 <Link
                   key={slug}
                   href={`/?store=${slug}`}
-                  className="block w-full px-6 py-4 border-2 rounded-lg transition-all text-center font-semibold hover:opacity-90"
-                  style={{
-                    backgroundColor: primaryColor,
-                    borderColor: accentColor,
-                    color: accentColor,
-                  }}
+                  className="flex flex-col items-center group"
                 >
-                  {displayName}
+                  {/* Square Button with Logo */}
+                  <div 
+                    className="w-full aspect-square rounded-lg border-4 transition-all hover:scale-105 hover:shadow-xl bg-white flex items-center justify-center p-6"
+                    style={{
+                      borderColor: accentColor,
+                    }}
+                  >
+                    <div className="relative w-full h-full">
+                      <Image
+                        src={logoSrc}
+                        alt={`${displayName} Logo`}
+                        fill
+                        className="object-contain"
+                      />
+                    </div>
+                  </div>
+                  
+                  {/* Display Name Below Button */}
+                  <p 
+                    className="mt-3 text-center font-semibold text-lg"
+                    style={{ color: primaryColor }}
+                  >
+                    {displayName}
+                  </p>
                 </Link>
               )
             })}
