@@ -576,10 +576,12 @@ export default function NewOrderForm({
       if (result.success && result.orderNumber) {
         setOrderNumber(result.orderNumber)
         console.log(`Order #${result.orderNumber} submitted successfully`)
-        // Scroll to submission status message
-        setTimeout(() => {
-          document.getElementById('submission-status')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-        }, 100)
+        // Scroll to submission status message (wait for paint to complete)
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            document.getElementById('submission-status')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+          })
+        })
       } else {
         console.error('Order submission failed:', result.error)
       }
