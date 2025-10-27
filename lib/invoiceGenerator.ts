@@ -267,9 +267,15 @@ async function generateProfessionalTemplateBuffer(data: InvoiceData): Promise<Bu
     doc.on('error', reject)
 
     // Add environment watermark for non-production
-    const isProduction = process.env.VERCEL_ENV === 'production' || process.env.NODE_ENV === 'production'
+    const vercelEnv = process.env.VERCEL_ENV
+    const nodeEnv = process.env.NODE_ENV
+    const isProduction = vercelEnv === 'production' || nodeEnv === 'production'
+    
+    console.log('[PDF] Environment check:', { vercelEnv, nodeEnv, isProduction })
+    
     if (!isProduction) {
-      const envLabel = (process.env.VERCEL_ENV || process.env.NODE_ENV || 'DEV').toUpperCase()
+      const envLabel = (vercelEnv || nodeEnv || 'DEV').toUpperCase()
+      console.log('[PDF] Adding watermark:', envLabel)
       doc.save()
       doc.rotate(-45, { origin: [306, 400] })
       doc.fontSize(60).fillColor('#ff0000').opacity(0.1)

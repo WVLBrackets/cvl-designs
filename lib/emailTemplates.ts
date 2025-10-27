@@ -8,10 +8,17 @@ import type { Order, OrderItem } from './types'
  * Get environment banner HTML for non-production emails
  */
 function getEnvironmentBanner(): string {
-  const isProduction = process.env.VERCEL_ENV === 'production' || process.env.NODE_ENV === 'production'
+  const vercelEnv = process.env.VERCEL_ENV
+  const nodeEnv = process.env.NODE_ENV
+  const isProduction = vercelEnv === 'production' || nodeEnv === 'production'
+  
+  console.log('[Email] Environment check:', { vercelEnv, nodeEnv, isProduction })
+  
   if (isProduction) return ''
   
-  const envLabel = (process.env.VERCEL_ENV || process.env.NODE_ENV || 'DEV').toUpperCase()
+  const envLabel = (vercelEnv || nodeEnv || 'DEV').toUpperCase()
+  console.log('[Email] Adding banner:', envLabel)
+  
   return `
     <div style="background-color: #dc2626; color: white; padding: 12px; text-align: center; font-weight: bold; border-bottom: 4px solid #991b1b;">
       ⚠️ ${envLabel} ENVIRONMENT - TEST EMAIL ⚠️
