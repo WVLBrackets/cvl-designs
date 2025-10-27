@@ -15,6 +15,7 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   // Check if we're in a non-production environment
+  // Only check VERCEL_ENV - NODE_ENV is always 'production' in builds
   const isProduction = process.env.VERCEL_ENV === 'production'
   const envName = process.env.VERCEL_ENV || 'development'
   

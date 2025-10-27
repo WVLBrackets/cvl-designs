@@ -10,7 +10,8 @@ import type { Order, OrderItem } from './types'
 function getEnvironmentBanner(): string {
   const vercelEnv = process.env.VERCEL_ENV
   const nodeEnv = process.env.NODE_ENV
-  const isProduction = vercelEnv === 'production' || nodeEnv === 'production'
+  // Only check VERCEL_ENV - NODE_ENV is always 'production' in builds
+  const isProduction = vercelEnv === 'production'
   
   console.log('[Email] Environment check:', { vercelEnv, nodeEnv, isProduction })
   
