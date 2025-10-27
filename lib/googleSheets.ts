@@ -56,7 +56,7 @@ export async function fetchMergedConfigForStore(storeSlug?: string): Promise<Sit
   const map: Record<string, string> = {
     'Header Logo': 'Store_Header_Logo',
     'Header Store Subtitle': 'Header_Store_Subtitle',
-    'DisplayName': 'Store_Display_Name',
+    'Display Name': 'Store_Display_Name',
     'Primary Color': 'Store_Primary_Color',
     'Accent Color': 'Store_Accent_Color',
   }
