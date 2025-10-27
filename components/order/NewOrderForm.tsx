@@ -556,6 +556,19 @@ export default function NewOrderForm({
     // Clear saved order from localStorage
     clearSavedOrder()
     
+    // Scroll to success message immediately (don't wait for API)
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        const element = document.getElementById('submission-status-anchor')
+        if (element) {
+          // Scroll with some offset to ensure full visibility
+          const yOffset = -20 // 20px above the element
+          const y = element.getBoundingClientRect().top + window.pageYOffset + yOffset
+          window.scrollTo({ top: y, behavior: 'smooth' })
+        }
+      })
+    })
+    
     // Submit order in background (fire and forget)
     try {
       const response = await fetch('/api/orders/submit', {
@@ -576,18 +589,6 @@ export default function NewOrderForm({
       if (result.success && result.orderNumber) {
         setOrderNumber(result.orderNumber)
         console.log(`Order #${result.orderNumber} submitted successfully`)
-        // Scroll to submission status message (wait for paint to complete)
-        requestAnimationFrame(() => {
-          requestAnimationFrame(() => {
-            const element = document.getElementById('submission-status-anchor')
-            if (element) {
-              // Scroll with some offset to ensure full visibility
-              const yOffset = -20 // 20px above the element
-              const y = element.getBoundingClientRect().top + window.pageYOffset + yOffset
-              window.scrollTo({ top: y, behavior: 'smooth' })
-            }
-          })
-        })
       } else {
         console.error('Order submission failed:', result.error)
       }
