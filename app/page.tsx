@@ -55,6 +55,7 @@ export default async function Home({
   const headerTitle = getCfgStr('Header_Title')
   const headerSubtitle = getCfgStr('Header_Subtitle')
   const headerStoreSubtitle = getCfgStr('Header_Store_Subtitle')
+  const storeDisplayName = getCfgStr('Store_Display_Name')
   const headerLogo = getCfgStr('Header_Logo')
   const headerLogoSrc = headerLogo
     ? (headerLogo.startsWith('/') || headerLogo.startsWith('http')
@@ -131,9 +132,24 @@ export default async function Home({
                 />
               </div>
               <div className="text-left">
+                {/* Row 1: Header Title */}
                 {headerTitle ? (<h1 className="text-3xl font-bold text-gray-900">{headerTitle}</h1>) : null}
+                
+                {/* Row 2: Header Subtitle */}
                 {headerSubtitle ? (<p className="text-gray-600">{headerSubtitle}</p>) : null}
-                {headerStoreSubtitle ? (<p className="text-sm text-gray-500 italic">{headerStoreSubtitle}</p>) : null}
+                
+                {/* Row 3: Line break (only if we have store name or subtitle below) */}
+                {(storeDisplayName || headerStoreSubtitle) && <div className="mt-2"></div>}
+                
+                {/* Row 4: Store Display Name + "Store" (80% of Row 1 size: 3xl * 0.8 = 2.4xl ≈ 1.875rem * 0.8 = 1.5rem) */}
+                {storeDisplayName ? (
+                  <h2 className="font-bold text-gray-900" style={{ fontSize: '1.5rem', lineHeight: '1.2' }}>
+                    {storeDisplayName} Store
+                  </h2>
+                ) : null}
+                
+                {/* Row 5: Header Store Subtitle (italics, same size as Row 2) */}
+                {headerStoreSubtitle ? (<p className="text-gray-600 italic">{headerStoreSubtitle}</p>) : null}
               </div>
             </div>
             
