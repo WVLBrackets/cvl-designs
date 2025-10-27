@@ -266,6 +266,19 @@ async function generateProfessionalTemplateBuffer(data: InvoiceData): Promise<Bu
     doc.on('end', () => resolve(Buffer.concat(buffers)))
     doc.on('error', reject)
 
+    // Add environment watermark for non-production
+    const isProduction = process.env.VERCEL_ENV === 'production' || process.env.NODE_ENV === 'production'
+    if (!isProduction) {
+      const envLabel = (process.env.VERCEL_ENV || process.env.NODE_ENV || 'DEV').toUpperCase()
+      doc.fontSize(60).fillColor('#ff0000').opacity(0.1)
+      doc.text(envLabel, 0, 400, {
+        align: 'center',
+        width: 612,
+        rotate: -45
+      })
+      doc.opacity(1) // Reset opacity
+    }
+
     // Get logo paths
     const headerLogoPath = path.join(process.cwd(), 'public', 'images', 'brand', data.headerLogo || 'VL Design Logo - Trimmed.png')
     const storeLogoPath = path.join(process.cwd(), 'public', 'images', 'brand', data.storeLogo || '')

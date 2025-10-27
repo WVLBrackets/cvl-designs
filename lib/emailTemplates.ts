@@ -4,6 +4,21 @@
 
 import type { Order, OrderItem } from './types'
 
+/**
+ * Get environment banner HTML for non-production emails
+ */
+function getEnvironmentBanner(): string {
+  const isProduction = process.env.VERCEL_ENV === 'production' || process.env.NODE_ENV === 'production'
+  if (isProduction) return ''
+  
+  const envLabel = (process.env.VERCEL_ENV || process.env.NODE_ENV || 'DEV').toUpperCase()
+  return `
+    <div style="background-color: #dc2626; color: white; padding: 12px; text-align: center; font-weight: bold; border-bottom: 4px solid #991b1b;">
+      ⚠️ ${envLabel} ENVIRONMENT - TEST EMAIL ⚠️
+    </div>
+  `
+}
+
 interface CustomerEmailData {
   customerName: string
   shortOrderNumber: string
@@ -112,6 +127,7 @@ export function generateCustomerEmail(data: CustomerEmailData): string {
       <title>Order Confirmation</title>
     </head>
     <body style="margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #f3f4f6;">
+      ${getEnvironmentBanner()}
       <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f3f4f6; padding: 40px 20px;">
         <tr>
           <td align="center">
@@ -256,6 +272,7 @@ export function generateAdminEmail(data: AdminEmailData): string {
       <title>New Order Notification</title>
     </head>
     <body style="margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #f3f4f6;">
+      ${getEnvironmentBanner()}
       <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f3f4f6; padding: 40px 20px;">
         <tr>
           <td align="center">
@@ -365,6 +382,7 @@ export function generateTechSupportEmail(data: TechSupportEmailData): string {
       <title>Order Submission Error</title>
     </head>
     <body style="margin: 0; padding: 0; font-family: 'Courier New', monospace; background-color: #1f2937;">
+      ${getEnvironmentBanner()}
       <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #1f2937; padding: 40px 20px;">
         <tr>
           <td align="center">
