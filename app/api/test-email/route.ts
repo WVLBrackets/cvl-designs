@@ -20,40 +20,23 @@ export async function GET() {
     console.log('Gmail User:', process.env.GMAIL_USER)
     console.log('Gmail Password configured:', !!process.env.GMAIL_APP_PASSWORD)
     
-    // Try to load nodemailer
-    console.log('Loading nodemailer...')
+    // Load nodemailer
     const nodemailerModule = await import('nodemailer')
-    console.log('Nodemailer module loaded')
-    console.log('Module keys:', Object.keys(nodemailerModule))
-    console.log('Has default:', 'default' in nodemailerModule)
-    console.log('Has createTransporter:', 'createTransporter' in nodemailerModule)
-    
-    // Try different ways to access nodemailer
-    const mailer = nodemailerModule.createTransport 
-      ? nodemailerModule 
-      : nodemailerModule.default
-    
-    console.log('Using mailer:', !!mailer)
-    console.log('Mailer has createTransport:', typeof mailer?.createTransport)
+    const nodemailer = nodemailerModule.default || nodemailerModule
     
     // Create transporter
-    console.log('Creating transporter...')
-    const transporter = mailer.createTransport({
+    const transporter = nodemailer.createTransport({
       service: 'gmail',
       auth: {
         user: process.env.GMAIL_USER,
         pass: process.env.GMAIL_APP_PASSWORD,
       },
     })
-    console.log('Transporter created successfully')
     
     // Verify connection
-    console.log('Verifying connection...')
     await transporter.verify()
-    console.log('Connection verified!')
     
     // Send test email
-    console.log('Sending test email...')
     const info = await transporter.sendMail({
       from: `"CVL Designs Test" <${process.env.GMAIL_USER}>`,
       to: process.env.GMAIL_USER, // Send to yourself
@@ -65,9 +48,6 @@ export async function GET() {
         <p><strong>Timestamp:</strong> ${new Date().toLocaleString()}</p>
       `,
     })
-    
-    console.log('Email sent successfully!')
-    console.log('Message ID:', info.messageId)
     
     return NextResponse.json({
       success: true,
