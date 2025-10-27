@@ -746,7 +746,12 @@ export default function NewOrderForm({
       {step !== 'adding-item' && (
         <div className="flex flex-col sm:flex-row gap-4">
           <button
-            onClick={() => setStep('adding-item')}
+            onClick={() => {
+              setStep('adding-item')
+              // Clear submission status when starting a new order
+              setSubmitStatus(null)
+              setHasSubmittedOrder(false)
+            }}
             disabled={!isCustomerInfoValid()}
             className="flex-1 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded-lg font-bold text-lg transition-colors"
           >
