@@ -31,7 +31,9 @@ export default async function Home({
 
   // Validate that the store exists
   const stores = await fetchStores()
-  const validStore = stores.find(s => s.Slug === storeSlug)
+  const validStore = stores.find(s => 
+    s.slug && s.slug.toLowerCase() === storeSlug.toLowerCase()
+  )
   
   if (!validStore) {
     // Invalid store - redirect to home with error
