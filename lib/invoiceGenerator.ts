@@ -270,13 +270,14 @@ async function generateProfessionalTemplateBuffer(data: InvoiceData): Promise<Bu
     const isProduction = process.env.VERCEL_ENV === 'production' || process.env.NODE_ENV === 'production'
     if (!isProduction) {
       const envLabel = (process.env.VERCEL_ENV || process.env.NODE_ENV || 'DEV').toUpperCase()
+      doc.save()
+      doc.rotate(-45, { origin: [306, 400] })
       doc.fontSize(60).fillColor('#ff0000').opacity(0.1)
       doc.text(envLabel, 0, 400, {
         align: 'center',
-        width: 612,
-        rotate: -45
+        width: 612
       })
-      doc.opacity(1) // Reset opacity
+      doc.restore()
     }
 
     // Get logo paths
