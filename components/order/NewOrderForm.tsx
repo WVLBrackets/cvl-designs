@@ -557,14 +557,20 @@ export default function NewOrderForm({
     clearSavedOrder()
     
     // Scroll to success message immediately (don't wait for API)
+    console.log('[SCROLL] Scheduling scroll to submission status...')
     requestAnimationFrame(() => {
+      console.log('[SCROLL] First animation frame')
       requestAnimationFrame(() => {
+        console.log('[SCROLL] Second animation frame, scrolling now...')
         const element = document.getElementById('submission-status-anchor')
         if (element) {
           // Scroll with some offset to ensure full visibility
           const yOffset = -20 // 20px above the element
           const y = element.getBoundingClientRect().top + window.pageYOffset + yOffset
+          console.log('[SCROLL] Scrolling to position:', y, 'Current position:', window.pageYOffset)
           window.scrollTo({ top: y, behavior: 'smooth' })
+        } else {
+          console.log('[SCROLL] ERROR: submission-status-anchor element not found!')
         }
       })
     })
