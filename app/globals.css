@@ -1,0 +1,55 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Store-specific color theming */
+:root {
+  --store-primary: #3b82f6;
+  --store-accent: #60a5fa;
+}
+
+/* Apply store colors to buttons and interactive elements */
+.btn-primary {
+  background-color: var(--store-primary);
+  border-color: var(--store-primary);
+}
+
+.btn-primary:hover {
+  background-color: var(--store-accent);
+  border-color: var(--store-accent);
+}
+
+.text-primary {
+  color: var(--store-primary);
+}
+
+.border-primary {
+  border-color: var(--store-primary);
+}
+
+.bg-primary {
+  background-color: var(--store-primary);
+}
+
+:root {
+  --foreground-rgb: 0, 0, 0;
+  --background-start-rgb: 255, 255, 255;
+  --background-end-rgb: 255, 255, 255;
+}
+
+body {
+  color: rgb(var(--foreground-rgb));
+  background: linear-gradient(
+      to bottom,
+      transparent,
+      rgb(var(--background-end-rgb))
+    )
+    rgb(var(--background-start-rgb));
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+}
+
