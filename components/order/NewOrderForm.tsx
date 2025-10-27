@@ -579,7 +579,13 @@ export default function NewOrderForm({
         // Scroll to submission status message (wait for paint to complete)
         requestAnimationFrame(() => {
           requestAnimationFrame(() => {
-            document.getElementById('submission-status')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+            const element = document.getElementById('submission-status-anchor')
+            if (element) {
+              // Scroll with some offset to ensure full visibility
+              const yOffset = -20 // 20px above the element
+              const y = element.getBoundingClientRect().top + window.pageYOffset + yOffset
+              window.scrollTo({ top: y, behavior: 'smooth' })
+            }
           })
         })
       } else {
@@ -606,13 +612,14 @@ export default function NewOrderForm({
       
       {/* Submit Status - Show at top after submission */}
       {submitStatus && (
-        <div
-          id="submission-status"
-          className={`rounded-lg p-4 text-center ${
-            submitStatus.type === 'success' ? 'bg-green-50 text-green-800' : 'bg-red-50 text-red-800'
-          }`}
-        >
-          <p className="font-medium">{submitStatus.message}</p>
+        <div id="submission-status-anchor" className="pt-4">
+          <div
+            className={`rounded-lg p-4 text-center ${
+              submitStatus.type === 'success' ? 'bg-green-50 text-green-800' : 'bg-red-50 text-red-800'
+            }`}
+          >
+            <p className="font-medium">{submitStatus.message}</p>
+          </div>
         </div>
       )}
       
