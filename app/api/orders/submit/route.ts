@@ -111,6 +111,14 @@ export async function POST(request: NextRequest) {
   }
 }
 
+// DEBUG FLAGS - Set to true/false to enable/disable each step
+const DEBUG_FLAGS = {
+  ENABLE_GOOGLE_SHEETS: true,   // ✅ Testing Google Sheets ONLY
+  ENABLE_PDF_GENERATION: false,  // ⏭️  Disabled for testing
+  ENABLE_CUSTOMER_EMAIL: false,  // ⏭️  Disabled for testing
+  ENABLE_ADMIN_EMAIL: false,     // ⏭️  Disabled for testing
+}
+
 /**
  * Process order asynchronously (Google Sheets, PDF, emails)
  */
@@ -121,76 +129,51 @@ async function processOrderAsync(
   const stepTimings: any = {}
   const startTime = Date.now()
   
+  console.log(`[${order.orderNumber}] 🚀 DEBUG FLAGS:`, DEBUG_FLAGS)
+  
   try {
     // Step 1: Generate Invoice PDF as Buffer (using professional template by default)
-    console.log(`[${order.orderNumber}] Step 1: Generating invoice PDF...`)
-    const step1Start = Date.now()
-    const pdfBuffer = await generateInvoicePDFBuffer(order, 'professional', config)
-    stepTimings.pdfGeneration = Date.now() - step1Start
+    let pdfBuffer: Buffer | null = null
+    let invoiceFilename = 'invoice.pdf'
     
-    // Generate filename for tracking
-    const customerLastName = order.contactInfo.parentLastName.replace(/[^a-zA-Z0-9]/g, '')
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-').replace('T', '_').split('Z')[0]
-    const invoiceFilename = `Invoice_${order.orderNumber}_${customerLastName}_${timestamp}_${order.environment}.pdf`
-    console.log(`[${order.orderNumber}] ✓ PDF generated in ${stepTimings.pdfGeneration}ms (${pdfBuffer.length} bytes)`)
+    if (DEBUG_FLAGS.ENABLE_PDF_GENERATION) {
+      console.log(`[${order.orderNumber}] Step 1: Generating invoice PDF...`)
+      const step1Start = Date.now()
+      pdfBuffer = await generateInvoicePDFBuffer(order, 'professional', config)
+      stepTimings.pdfGeneration = Date.now() - step1Start
+      
+      // Generate filename for tracking
+      const customerLastName = order.contactInfo.parentLastName.replace(/[^a-zA-Z0-9]/g, '')
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-').replace('T', '_').split('Z')[0]
+      invoiceFilename = `Invoice_${order.orderNumber}_${customerLastName}_${timestamp}_${order.environment}.pdf`
+      console.log(`[${order.orderNumber}] ✓ PDF generated in ${stepTimings.pdfGeneration}ms (${pdfBuffer.length} bytes)`)
+    } else {
+      console.log(`[${order.orderNumber}] ⏭️  Step 1: PDF generation SKIPPED (DEBUG_FLAGS.ENABLE_PDF_GENERATION = false)`)
+    }
     
     // Add invoice filename to order object for Google Sheets
     ;(order as any).invoiceFilename = invoiceFilename
     
     // Step 2: Submit to Google Sheets (now with invoice filename)
-    console.log(`[${order.orderNumber}] Step 2: Submitting to Google Sheets...`)
-    const step2Start = Date.now()
-    const sheetResult = await submitOrder(order)
-    stepTimings.googleSheets = Date.now() - step2Start
-    if (!sheetResult.success) {
-      throw new Error(`Google Sheets submission failed: ${sheetResult.error}`)
+    if (DEBUG_FLAGS.ENABLE_GOOGLE_SHEETS) {
+      console.log(`[${order.orderNumber}] Step 2: Submitting to Google Sheets...`)
+      const step2Start = Date.now()
+      const sheetResult = await submitOrder(order)
+      stepTimings.googleSheets = Date.now() - step2Start
+      if (!sheetResult.success) {
+        throw new Error(`Google Sheets submission failed: ${sheetResult.error}`)
+      }
+      console.log(`[${order.orderNumber}] ✓ Saved to Google Sheets in ${stepTimings.googleSheets}ms`)
+    } else {
+      console.log(`[${order.orderNumber}] ⏭️  Step 2: Google Sheets SKIPPED (DEBUG_FLAGS.ENABLE_GOOGLE_SHEETS = false)`)
     }
-    console.log(`[${order.orderNumber}] ✓ Saved to Google Sheets in ${stepTimings.googleSheets}ms`)
     
     // Step 3: Send customer confirmation email with PDF attachment
-    console.log(`[${order.orderNumber}] Step 3: Sending customer email to ${order.contactInfo.email}...`)
-    const step3Start = Date.now()
-    const customerEmailHtml = generateCustomerEmail({
-      customerName: `${order.contactInfo.parentFirstName} ${order.contactInfo.parentLastName}`,
-      shortOrderNumber: order.shortOrderNumber,
-      orderDate: new Date(order.orderDate).toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric',
-      }),
-      items: order.items,
-      total: order.totalAmount,
-      paymentInstructions: {
-        venmo: config.Venmo_Handle,
-        cashapp: config.CashApp_Handle,
-        zelle: config.Zelle_Email,
-      },
-      businessName: config['Business Name'] || config.Business_Name || config.BusinessName || 'CVL Designs',
-    })
-    
-    await sendEmail({
-      to: order.contactInfo.email,
-      subject: `Order Confirmation #${order.shortOrderNumber} - ${config['Business Name'] || config.Business_Name || 'CVL Designs'}`,
-      html: customerEmailHtml,
-      attachments: [{
-        filename: `Invoice_${order.shortOrderNumber}.pdf`,
-        content: pdfBuffer,
-      }],
-    })
-    stepTimings.customerEmail = Date.now() - step3Start
-    console.log(`[${order.orderNumber}] ✓ Customer email sent in ${stepTimings.customerEmail}ms`)
-    
-    // Step 4: Send admin notification email with PDF attachment
-    console.log(`[${order.orderNumber}] Step 4: Sending admin notification...`)
-    const step4Start = Date.now()
-    const adminEmail = config.ContactMeEmail || config.Contact_Me_Email
-    if (adminEmail) {
-      console.log(`[${order.orderNumber}] Admin email: ${adminEmail}`)
-      const adminEmailHtml = generateAdminEmail({
+    if (DEBUG_FLAGS.ENABLE_CUSTOMER_EMAIL) {
+      console.log(`[${order.orderNumber}] Step 3: Sending customer email to ${order.contactInfo.email}...`)
+      const step3Start = Date.now()
+      const customerEmailHtml = generateCustomerEmail({
         customerName: `${order.contactInfo.parentFirstName} ${order.contactInfo.parentLastName}`,
-        customerEmail: order.contactInfo.email,
-        customerPhone: order.contactInfo.phoneNumber,
-        fullOrderNumber: order.orderNumber,
         shortOrderNumber: order.shortOrderNumber,
         orderDate: new Date(order.orderDate).toLocaleDateString('en-US', {
           year: 'numeric',
@@ -199,24 +182,70 @@ async function processOrderAsync(
         }),
         items: order.items,
         total: order.totalAmount,
-        storeName: order.storeSlug?.toUpperCase() || 'STORE',
+        paymentInstructions: {
+          venmo: config.Venmo_Handle,
+          cashapp: config.CashApp_Handle,
+          zelle: config.Zelle_Email,
+        },
         businessName: config['Business Name'] || config.Business_Name || config.BusinessName || 'CVL Designs',
-        primaryColor: config.Store_Primary_Color,
       })
       
       await sendEmail({
-        to: adminEmail,
-        subject: `🔔 New Order #${order.shortOrderNumber} - ${order.storeSlug?.toUpperCase() || 'STORE'}`,
-        html: adminEmailHtml,
-        attachments: [{
+        to: order.contactInfo.email,
+        subject: `Order Confirmation #${order.shortOrderNumber} - ${config['Business Name'] || config.Business_Name || 'CVL Designs'}`,
+        html: customerEmailHtml,
+        attachments: pdfBuffer ? [{
           filename: `Invoice_${order.shortOrderNumber}.pdf`,
           content: pdfBuffer,
-        }],
+        }] : [],
       })
-      stepTimings.adminEmail = Date.now() - step4Start
-      console.log(`[${order.orderNumber}] ✓ Admin notification sent in ${stepTimings.adminEmail}ms`)
+      stepTimings.customerEmail = Date.now() - step3Start
+      console.log(`[${order.orderNumber}] ✓ Customer email sent in ${stepTimings.customerEmail}ms`)
     } else {
-      console.log(`[${order.orderNumber}] ⚠️ No admin email configured, skipping admin notification`)
+      console.log(`[${order.orderNumber}] ⏭️  Step 3: Customer email SKIPPED (DEBUG_FLAGS.ENABLE_CUSTOMER_EMAIL = false)`)
+    }
+    
+    // Step 4: Send admin notification email with PDF attachment
+    if (DEBUG_FLAGS.ENABLE_ADMIN_EMAIL) {
+      console.log(`[${order.orderNumber}] Step 4: Sending admin notification...`)
+      const step4Start = Date.now()
+      const adminEmail = config.ContactMeEmail || config.Contact_Me_Email
+      if (adminEmail) {
+        console.log(`[${order.orderNumber}] Admin email: ${adminEmail}`)
+        const adminEmailHtml = generateAdminEmail({
+          customerName: `${order.contactInfo.parentFirstName} ${order.contactInfo.parentLastName}`,
+          customerEmail: order.contactInfo.email,
+          customerPhone: order.contactInfo.phoneNumber,
+          fullOrderNumber: order.orderNumber,
+          shortOrderNumber: order.shortOrderNumber,
+          orderDate: new Date(order.orderDate).toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+          }),
+          items: order.items,
+          total: order.totalAmount,
+          storeName: order.storeSlug?.toUpperCase() || 'STORE',
+          businessName: config['Business Name'] || config.Business_Name || config.BusinessName || 'CVL Designs',
+          primaryColor: config.Store_Primary_Color,
+        })
+        
+        await sendEmail({
+          to: adminEmail,
+          subject: `🔔 New Order #${order.shortOrderNumber} - ${order.storeSlug?.toUpperCase() || 'STORE'}`,
+          html: adminEmailHtml,
+          attachments: pdfBuffer ? [{
+            filename: `Invoice_${order.shortOrderNumber}.pdf`,
+            content: pdfBuffer,
+          }] : [],
+        })
+        stepTimings.adminEmail = Date.now() - step4Start
+        console.log(`[${order.orderNumber}] ✓ Admin notification sent in ${stepTimings.adminEmail}ms`)
+      } else {
+        console.log(`[${order.orderNumber}] ⚠️ No admin email configured, skipping admin notification`)
+      }
+    } else {
+      console.log(`[${order.orderNumber}] ⏭️  Step 4: Admin email SKIPPED (DEBUG_FLAGS.ENABLE_ADMIN_EMAIL = false)`)
     }
     
     stepTimings.total = Date.now() - startTime
