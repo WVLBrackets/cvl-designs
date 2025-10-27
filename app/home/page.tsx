@@ -75,7 +75,10 @@ export default async function HomePage() {
       {/* Store Selector */}
       <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
         <div className="bg-white rounded-lg shadow-lg p-8">
-          <h2 className="text-2xl font-bold text-gray-900 mb-4 text-center">{homePageTitle}</h2>
+          <div className="flex items-center justify-center gap-3 mb-4">
+            <h2 className="text-2xl font-bold text-gray-900 text-center">{homePageTitle}</h2>
+            <span className="text-4xl" role="img" aria-label="smiley face">😊</span>
+          </div>
           <p className="text-gray-600 mb-8 text-center">{homePageInstruction}</p>
           
           <div className="space-y-3">
