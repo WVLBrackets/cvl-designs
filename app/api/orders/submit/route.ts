@@ -60,7 +60,8 @@ export async function POST(request: NextRequest) {
       // Send tech support email about the failure
       sendTechSupportEmail(error, order, config).catch(err => {
         console.error('Failed to send tech support email:', err)
-        logEmailError(String(config.Tech_Support_Email || 'unknown'), 'Tech Support Error Notification', err)
+        const techEmail = 'Tech_Support_Email' in config ? String(config.Tech_Support_Email || 'unknown') : 'unknown'
+        logEmailError(techEmail, 'Tech Support Error Notification', err)
       })
     })
     
@@ -80,7 +81,8 @@ export async function POST(request: NextRequest) {
     if (orderData) {
       const config = await fetchConfiguration().catch(() => ({}))
       await sendTechSupportEmail(error, orderData, config).catch(err => {
-        logEmailError(String(config.Tech_Support_Email || 'unknown'), 'Tech Support Error Notification', err)
+        const techEmail = 'Tech_Support_Email' in config ? String(config.Tech_Support_Email || 'unknown') : 'unknown'
+        logEmailError(techEmail, 'Tech Support Error Notification', err)
       })
     }
     
