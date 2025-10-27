@@ -390,17 +390,27 @@ export async function fetchProducts(storeSlug?: string): Promise<Product[]> {
  */
 export async function submitOrder(order: Order): Promise<{ success: boolean; error?: string }> {
   try {
+    console.log('[submitOrder] Starting order submission...')
+    console.log('[submitOrder] Order environment:', order.environment)
+    console.log('[submitOrder] Order items count:', order.items.length)
+    
     const sheets = await getSheetsClient()
+    console.log('[submitOrder] ✓ Google Sheets client initialized')
+    
     const spreadsheetId = getSheetId('orders')
+    console.log('[submitOrder] Target spreadsheet ID:', spreadsheetId)
     
     // Check if headers exist
+    console.log('[submitOrder] Checking for existing headers...')
     const checkResponse = await sheets.spreadsheets.values.get({
       spreadsheetId,
       range: 'A1:P1',
     })
+    console.log('[submitOrder] ✓ Headers checked')
     
     // Add headers if needed
     if (!checkResponse.data.values || checkResponse.data.values.length === 0) {
+      console.log('[submitOrder] No headers found, creating them...')
       await sheets.spreadsheets.values.update({
         spreadsheetId,
         range: 'A1:T1',
@@ -430,9 +440,13 @@ export async function submitOrder(order: Order): Promise<{ success: boolean; err
           ]],
         },
       })
+      console.log('[submitOrder] ✓ Headers created')
+    } else {
+      console.log('[submitOrder] Headers already exist')
     }
     
     // Prepare rows for each item (repeat rows for quantities > 1)
+    console.log('[submitOrder] Preparing order rows...')
     const rows: any[] = []
     
     order.items.forEach((item) => {
@@ -482,7 +496,10 @@ export async function submitOrder(order: Order): Promise<{ success: boolean; err
       }
     })
     
+    console.log('[submitOrder] Total rows to append:', rows.length)
+    
     // Append rows
+    console.log('[submitOrder] Appending rows to sheet...')
     await sheets.spreadsheets.values.append({
       spreadsheetId,
       range: 'A2:T2',
@@ -491,10 +508,16 @@ export async function submitOrder(order: Order): Promise<{ success: boolean; err
         values: rows,
       },
     })
+    console.log('[submitOrder] ✓ Rows appended successfully')
     
     return { success: true }
   } catch (error) {
-    console.error('Error submitting order:', error)
+    console.error('[submitOrder] ❌ Error submitting order:', error)
+    console.error('[submitOrder] Error type:', error instanceof Error ? error.constructor.name : typeof error)
+    console.error('[submitOrder] Error message:', error instanceof Error ? error.message : String(error))
+    if (error instanceof Error && error.stack) {
+      console.error('[submitOrder] Error stack:', error.stack)
+    }
     return { 
       success: false, 
       error: error instanceof Error ? error.message : 'Unknown error occurred' 
