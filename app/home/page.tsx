@@ -91,8 +91,8 @@ export default async function HomePage({
           </div>
           <p className="text-gray-600 mb-8 text-center">{homePageInstruction}</p>
           
-          {/* 2x2 Grid of Store Buttons */}
-          <div className="grid grid-cols-2 gap-6">
+          {/* 2x2 Grid of Store Buttons (75% size) */}
+          <div className="grid grid-cols-2 gap-6 max-w-lg mx-auto">
             {stores.map((store) => {
               const slug = store.slug || ''
               const displayName = store['Display Name'] || store.DisplayName || slug
