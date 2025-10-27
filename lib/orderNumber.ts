@@ -109,44 +109,62 @@ async function getNextSequenceNumber(environment: string): Promise<number> {
       }
     }
     
-    // Get all existing rows for this environment to calculate next sequence
-    let existingRows = 0
+    // Append first - let Google Sheets assign the row number atomically
+    // This eliminates race conditions since Google handles row assignment
+    console.log(`[OrderNumber] Appending to OrderSequence sheet...`)
+    
+    let nextSequence: number
+    
     try {
-      const response = await sheets.spreadsheets.values.get({
-        spreadsheetId: configSheetId,
-        range: `${sheetName}!A2:C`,
-      })
-      
-      // Count rows that match this environment
-      const rows = response.data.values || []
-      existingRows = rows.filter(row => row[1] === environment).length
-      
-      console.log(`[OrderNumber] Found ${existingRows} existing ${environment} orders`)
-    } catch (error) {
-      console.log('[OrderNumber] No existing rows found')
-    }
-    
-    // Next sequence is count + 1
-    const nextSequence = existingRows + 1
-    
-    console.log(`[OrderNumber] Next sequence: ${nextSequence}`)
-    
-    // Append a new row to record this sequence
-    // This provides an audit trail and helps prevent duplicates
-    try {
-      await sheets.spreadsheets.values.append({
+      const appendResult = await sheets.spreadsheets.values.append({
         spreadsheetId: configSheetId,
         range: `${sheetName}!A2:C2`,
         valueInputOption: 'RAW',
         requestBody: {
-          values: [[timestamp, environment, nextSequence]]
+          values: [[timestamp, environment, 'PENDING']]  // Placeholder, will update
         }
       })
       
-      console.log(`[OrderNumber] ✓ Sequence ${nextSequence} recorded`)
+      // Extract the row number that Google Sheets assigned
+      // updatedRange format: "OrderSequence!A5:C5" (row 5)
+      const updatedRange = appendResult.data.updates?.updatedRange
+      if (!updatedRange) {
+        throw new Error('No updatedRange returned from append operation')
+      }
+      
+      console.log(`[OrderNumber] Updated range: ${updatedRange}`)
+      
+      // Extract row number (e.g., "OrderSequence!A5:C5" → "5")
+      const rowMatch = updatedRange.match(/!A(\d+):/)
+      if (!rowMatch) {
+        throw new Error(`Could not extract row number from range: ${updatedRange}`)
+      }
+      
+      const rowNumber = parseInt(rowMatch[1], 10)
+      // Sequence is row number minus 1 (for header row)
+      nextSequence = rowNumber - 1
+      
+      console.log(`[OrderNumber] Assigned row ${rowNumber}, sequence: ${nextSequence}`)
+      
+      // Update the row with the actual sequence number
+      try {
+        await sheets.spreadsheets.values.update({
+          spreadsheetId: configSheetId,
+          range: `${sheetName}!C${rowNumber}`,
+          valueInputOption: 'RAW',
+          requestBody: {
+            values: [[nextSequence]]
+          }
+        })
+        console.log(`[OrderNumber] ✓ Sequence ${nextSequence} recorded`)
+      } catch (updateError) {
+        console.warn('[OrderNumber] Failed to update sequence in sheet (continuing anyway):', updateError)
+        // Continue anyway - we have the sequence from the row number
+      }
+      
     } catch (appendError) {
-      console.warn('[OrderNumber] Failed to record sequence (continuing anyway):', appendError)
-      // Continue anyway - the sequence was calculated and will be used
+      console.error('[OrderNumber] Failed to append to OrderSequence:', appendError)
+      throw appendError
     }
     
     return nextSequence
