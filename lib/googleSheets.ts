@@ -402,11 +402,18 @@ export async function submitOrder(order: Order): Promise<{ success: boolean; err
     
     // Check if headers exist
     console.log('[submitOrder] Checking for existing headers...')
-    const checkResponse = await sheets.spreadsheets.values.get({
-      spreadsheetId,
-      range: 'A1:P1',
-    })
-    console.log('[submitOrder] ✓ Headers checked')
+    let checkResponse
+    try {
+      checkResponse = await sheets.spreadsheets.values.get({
+        spreadsheetId,
+        range: 'A1:T1', // Updated to match our full range
+      })
+      console.log('[submitOrder] ✓ Headers checked, found:', checkResponse.data.values?.length || 0, 'rows')
+    } catch (headerError) {
+      console.log('[submitOrder] ⚠️ Error checking headers (sheet might be empty):', headerError)
+      // Assume no headers if check fails
+      checkResponse = { data: { values: [] } }
+    }
     
     // Add headers if needed
     if (!checkResponse.data.values || checkResponse.data.values.length === 0) {
