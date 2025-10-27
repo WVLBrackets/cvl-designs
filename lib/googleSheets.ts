@@ -400,10 +400,6 @@ export async function submitOrder(order: Order): Promise<{ success: boolean; err
     const spreadsheetId = getSheetId('orders')
     console.log('[submitOrder] Target spreadsheet ID:', spreadsheetId)
     
-    // TEMPORARY: Skip header check entirely and just append
-    console.log('[submitOrder] ⚠️ SKIPPING header check (DEBUG MODE)')
-    console.log('[submitOrder] Assuming headers exist in sheet...')
-    
     // Prepare rows for each item (repeat rows for quantities > 1)
     console.log('[submitOrder] Preparing order rows...')
     const rows: any[] = []
