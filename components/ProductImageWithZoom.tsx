@@ -39,9 +39,10 @@ export default function ProductImageWithZoom({
     hoverTimeoutRef.current = setTimeout(() => {
       if (imageRef.current) {
         const rect = imageRef.current.getBoundingClientRect()
+        // Position zoomed image so its top-left aligns with original's top-left
         setZoomPosition({
-          x: rect.left + rect.width / 2,
-          y: rect.top + rect.height / 2,
+          x: rect.left,
+          y: rect.top,
         })
       }
       setShowZoom(true)
@@ -90,7 +91,7 @@ export default function ProductImageWithZoom({
           style={{
             left: `${zoomPosition.x}px`,
             top: `${zoomPosition.y}px`,
-            transform: 'translate(-50%, -50%)',
+            // No transform - align top-left corners directly
           }}
         >
           <div className="bg-white rounded-lg shadow-2xl border-4 border-gray-300 overflow-hidden">
