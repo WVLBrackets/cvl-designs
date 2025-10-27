@@ -677,9 +677,16 @@ export default function NewOrderForm({
               onSelect={(product) => {
                 setCurrentItem({ ...currentItem, product, size: '', selectedDesignOptions: [], selectedCustomizationOptions: [], customizationData: [] })
                 // Scroll to product section when detail page is shown
-                setTimeout(() => {
-                  document.getElementById('product-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-                }, 100)
+                requestAnimationFrame(() => {
+                  requestAnimationFrame(() => {
+                    const element = document.getElementById('product-section')
+                    if (element) {
+                      const yOffset = -20 // 20px above the element
+                      const y = element.getBoundingClientRect().top + window.pageYOffset + yOffset
+                      window.scrollTo({ top: y, behavior: 'smooth' })
+                    }
+                  })
+                })
               }}
               detailMode={!!currentItem.product}
             />
@@ -775,9 +782,16 @@ export default function NewOrderForm({
               setSubmitStatus(null)
               setHasSubmittedOrder(false)
               // Scroll to product catalog
-              setTimeout(() => {
-                document.getElementById('product-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-              }, 100)
+              requestAnimationFrame(() => {
+                requestAnimationFrame(() => {
+                  const element = document.getElementById('product-section')
+                  if (element) {
+                    const yOffset = -20 // 20px above the element
+                    const y = element.getBoundingClientRect().top + window.pageYOffset + yOffset
+                    window.scrollTo({ top: y, behavior: 'smooth' })
+                  }
+                })
+              })
             }}
             disabled={!isCustomerInfoValid()}
             className="flex-1 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded-lg font-bold text-lg transition-colors"
