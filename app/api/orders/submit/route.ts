@@ -171,10 +171,37 @@ async function processOrderAsync(
       console.log(`[${order.orderNumber}] ⏭️  Step 2: Google Sheets SKIPPED (FEATURE_FLAGS.ENABLE_GOOGLE_SHEETS = false)`)
     }
     
-    // Step 3: Send customer confirmation email with PDF attachment
-    if (FEATURE_FLAGS.ENABLE_CUSTOMER_EMAIL) {
-      console.log(`[${order.orderNumber}] Step 3: Sending customer email to ${order.contactInfo.email}...`)
+    // Step 3: Upload invoice to Google Drive
+    if (pdfBuffer) {
+      console.log(`[${order.orderNumber}] Step 3: Uploading invoice to Google Drive...`)
       const step3Start = Date.now()
+      try {
+        const { uploadInvoiceToDrive } = await import('@/lib/googleDrive')
+        const driveResult = await uploadInvoiceToDrive(
+          pdfBuffer,
+          order.orderNumber,
+          order.contactInfo.parentFirstName,
+          order.contactInfo.parentLastName,
+          order.environment
+        )
+        stepTimings.googleDrive = Date.now() - step3Start
+        if (driveResult.success) {
+          console.log(`[${order.orderNumber}] ✓ Invoice uploaded to Google Drive in ${stepTimings.googleDrive}ms (File ID: ${driveResult.fileId})`)
+        } else {
+          console.warn(`[${order.orderNumber}] ⚠️ Google Drive upload failed: ${driveResult.error}`)
+        }
+      } catch (driveError) {
+        console.error(`[${order.orderNumber}] ⚠️ Google Drive upload error:`, driveError)
+        // Continue anyway - don't block order submission
+      }
+    } else {
+      console.log(`[${order.orderNumber}] ⏭️  Step 3: Google Drive upload SKIPPED (no PDF buffer)`)
+    }
+    
+    // Step 4: Send customer confirmation email with PDF attachment
+    if (FEATURE_FLAGS.ENABLE_CUSTOMER_EMAIL) {
+      console.log(`[${order.orderNumber}] Step 4: Sending customer email to ${order.contactInfo.email}...`)
+      const step4Start = Date.now()
       const customerEmailHtml = generateCustomerEmail({
         customerName: `${order.contactInfo.parentFirstName} ${order.contactInfo.parentLastName}`,
         shortOrderNumber: order.shortOrderNumber,
@@ -202,16 +229,16 @@ async function processOrderAsync(
           content: pdfBuffer,
         }] : [],
       })
-      stepTimings.customerEmail = Date.now() - step3Start
+      stepTimings.customerEmail = Date.now() - step4Start
       console.log(`[${order.orderNumber}] ✓ Customer email sent in ${stepTimings.customerEmail}ms`)
     } else {
-      console.log(`[${order.orderNumber}] ⏭️  Step 3: Customer email SKIPPED (FEATURE_FLAGS.ENABLE_CUSTOMER_EMAIL = false)`)
+      console.log(`[${order.orderNumber}] ⏭️  Step 4: Customer email SKIPPED (FEATURE_FLAGS.ENABLE_CUSTOMER_EMAIL = false)`)
     }
     
-    // Step 4: Send admin notification email with PDF attachment
+    // Step 5: Send admin notification email with PDF attachment
     if (FEATURE_FLAGS.ENABLE_ADMIN_EMAIL) {
-      console.log(`[${order.orderNumber}] Step 4: Sending admin notification...`)
-      const step4Start = Date.now()
+      console.log(`[${order.orderNumber}] Step 5: Sending admin notification...`)
+      const step5Start = Date.now()
       const adminEmail = config.ContactMeEmail || config.Contact_Me_Email
       if (adminEmail) {
         console.log(`[${order.orderNumber}] Admin email: ${adminEmail}`)
@@ -242,13 +269,13 @@ async function processOrderAsync(
             content: pdfBuffer,
           }] : [],
         })
-        stepTimings.adminEmail = Date.now() - step4Start
+        stepTimings.adminEmail = Date.now() - step5Start
         console.log(`[${order.orderNumber}] ✓ Admin notification sent in ${stepTimings.adminEmail}ms`)
       } else {
         console.log(`[${order.orderNumber}] ⚠️ No admin email configured, skipping admin notification`)
       }
     } else {
-      console.log(`[${order.orderNumber}] ⏭️  Step 4: Admin email SKIPPED (FEATURE_FLAGS.ENABLE_ADMIN_EMAIL = false)`)
+      console.log(`[${order.orderNumber}] ⏭️  Step 5: Admin email SKIPPED (FEATURE_FLAGS.ENABLE_ADMIN_EMAIL = false)`)
     }
     
     stepTimings.total = Date.now() - startTime
