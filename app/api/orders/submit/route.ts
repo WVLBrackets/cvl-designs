@@ -114,12 +114,12 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// DEBUG FLAGS - Set to true/false to enable/disable each step
-const DEBUG_FLAGS = {
-  ENABLE_GOOGLE_SHEETS: true,   // ✅ Working!
-  ENABLE_PDF_GENERATION: true,  // ✅ Working!
-  ENABLE_CUSTOMER_EMAIL: true,  // ✅ Enable customer email
-  ENABLE_ADMIN_EMAIL: true,     // ✅ Enable admin email
+// Feature flags - Set to true/false to enable/disable each step
+const FEATURE_FLAGS = {
+  ENABLE_GOOGLE_SHEETS: true,
+  ENABLE_PDF_GENERATION: true,
+  ENABLE_CUSTOMER_EMAIL: true,
+  ENABLE_ADMIN_EMAIL: true,
 }
 
 /**
@@ -132,14 +132,14 @@ async function processOrderAsync(
   const stepTimings: any = {}
   const startTime = Date.now()
   
-  console.log(`[${order.orderNumber}] 🚀 DEBUG FLAGS:`, DEBUG_FLAGS)
+  // All features enabled
   
   try {
     // Step 1: Generate Invoice PDF as Buffer (using professional template by default)
     let pdfBuffer: Buffer | null = null
     let invoiceFilename = 'invoice.pdf'
     
-    if (DEBUG_FLAGS.ENABLE_PDF_GENERATION) {
+    if (FEATURE_FLAGS.ENABLE_PDF_GENERATION) {
       console.log(`[${order.orderNumber}] Step 1: Generating invoice PDF...`)
       const step1Start = Date.now()
       pdfBuffer = await generateInvoicePDFBuffer(order, 'professional', config)
@@ -151,14 +151,14 @@ async function processOrderAsync(
       invoiceFilename = `Invoice_${order.orderNumber}_${customerLastName}_${timestamp}_${order.environment}.pdf`
       console.log(`[${order.orderNumber}] ✓ PDF generated in ${stepTimings.pdfGeneration}ms (${pdfBuffer.length} bytes)`)
     } else {
-      console.log(`[${order.orderNumber}] ⏭️  Step 1: PDF generation SKIPPED (DEBUG_FLAGS.ENABLE_PDF_GENERATION = false)`)
+      console.log(`[${order.orderNumber}] ⏭️  Step 1: PDF generation SKIPPED (FEATURE_FLAGS.ENABLE_PDF_GENERATION = false)`)
     }
     
     // Add invoice filename to order object for Google Sheets
     ;(order as any).invoiceFilename = invoiceFilename
     
     // Step 2: Submit to Google Sheets (now with invoice filename)
-    if (DEBUG_FLAGS.ENABLE_GOOGLE_SHEETS) {
+    if (FEATURE_FLAGS.ENABLE_GOOGLE_SHEETS) {
       console.log(`[${order.orderNumber}] Step 2: Submitting to Google Sheets...`)
       const step2Start = Date.now()
       const sheetResult = await submitOrder(order)
@@ -168,11 +168,11 @@ async function processOrderAsync(
       }
       console.log(`[${order.orderNumber}] ✓ Saved to Google Sheets in ${stepTimings.googleSheets}ms`)
     } else {
-      console.log(`[${order.orderNumber}] ⏭️  Step 2: Google Sheets SKIPPED (DEBUG_FLAGS.ENABLE_GOOGLE_SHEETS = false)`)
+      console.log(`[${order.orderNumber}] ⏭️  Step 2: Google Sheets SKIPPED (FEATURE_FLAGS.ENABLE_GOOGLE_SHEETS = false)`)
     }
     
     // Step 3: Send customer confirmation email with PDF attachment
-    if (DEBUG_FLAGS.ENABLE_CUSTOMER_EMAIL) {
+    if (FEATURE_FLAGS.ENABLE_CUSTOMER_EMAIL) {
       console.log(`[${order.orderNumber}] Step 3: Sending customer email to ${order.contactInfo.email}...`)
       const step3Start = Date.now()
       const customerEmailHtml = generateCustomerEmail({
@@ -205,11 +205,11 @@ async function processOrderAsync(
       stepTimings.customerEmail = Date.now() - step3Start
       console.log(`[${order.orderNumber}] ✓ Customer email sent in ${stepTimings.customerEmail}ms`)
     } else {
-      console.log(`[${order.orderNumber}] ⏭️  Step 3: Customer email SKIPPED (DEBUG_FLAGS.ENABLE_CUSTOMER_EMAIL = false)`)
+      console.log(`[${order.orderNumber}] ⏭️  Step 3: Customer email SKIPPED (FEATURE_FLAGS.ENABLE_CUSTOMER_EMAIL = false)`)
     }
     
     // Step 4: Send admin notification email with PDF attachment
-    if (DEBUG_FLAGS.ENABLE_ADMIN_EMAIL) {
+    if (FEATURE_FLAGS.ENABLE_ADMIN_EMAIL) {
       console.log(`[${order.orderNumber}] Step 4: Sending admin notification...`)
       const step4Start = Date.now()
       const adminEmail = config.ContactMeEmail || config.Contact_Me_Email
@@ -248,7 +248,7 @@ async function processOrderAsync(
         console.log(`[${order.orderNumber}] ⚠️ No admin email configured, skipping admin notification`)
       }
     } else {
-      console.log(`[${order.orderNumber}] ⏭️  Step 4: Admin email SKIPPED (DEBUG_FLAGS.ENABLE_ADMIN_EMAIL = false)`)
+      console.log(`[${order.orderNumber}] ⏭️  Step 4: Admin email SKIPPED (FEATURE_FLAGS.ENABLE_ADMIN_EMAIL = false)`)
     }
     
     stepTimings.total = Date.now() - startTime
