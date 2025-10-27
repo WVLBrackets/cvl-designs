@@ -157,7 +157,7 @@ async function generateMinimalTemplate(filepath: string, data: InvoiceData): Pro
 
     // Total
     doc.moveDown()
-    doc.fontSize(14).text(`Total: $${data.total.toFixed(2)}`, { align: 'right', bold: true })
+    doc.fontSize(14).text(`Total: $${data.total.toFixed(2)}`, { align: 'right' })
     doc.moveDown(2)
 
     // Payment Instructions
