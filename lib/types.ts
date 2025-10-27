@@ -79,15 +79,6 @@ export interface SizeOption {
 }
 
 /**
- * Customization option for the back of the item
- */
-export interface CustomizationOption {
-  value: string
-  label: string
-  price: number
-}
-
-/**
  * Customer contact information
  */
 export interface ContactInfo {
