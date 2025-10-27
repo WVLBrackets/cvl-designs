@@ -9,10 +9,19 @@ import path from 'path'
 /**
  * Log an error to file
  */
-export function logError(context: string, error: any, additionalData?: any) {
+export async function logError(context: string, error: any, additionalData?: any): Promise<void> {
   try {
     const timestamp = new Date().toISOString()
     const env = process.env.NODE_ENV || 'development'
+    
+    // In serverless environments (like Vercel), we can't write to disk
+    // So we'll just log to console
+    if (process.env.VERCEL || !fs.existsSync) {
+      console.error(`[ERROR LOG] ${context}:`, error?.message || String(error))
+      if (error?.stack) console.error('Stack:', error.stack)
+      if (additionalData) console.error('Additional Data:', JSON.stringify(additionalData, null, 2))
+      return
+    }
     
     // Create logs directory if it doesn't exist
     const logsDir = path.join(process.cwd(), 'logs')
@@ -23,20 +32,6 @@ export function logError(context: string, error: any, additionalData?: any) {
     // Create log filename with date
     const dateStr = new Date().toISOString().split('T')[0] // YYYY-MM-DD
     const logFile = path.join(logsDir, `error-${env}-${dateStr}.log`)
-    
-    // Format error message
-    const logEntry = {
-      timestamp,
-      environment: env,
-      context,
-      error: {
-        message: error?.message || String(error),
-        name: error?.name,
-        code: error?.code,
-        stack: error?.stack,
-      },
-      additionalData,
-    }
     
     // Format as readable text
     const logText = `
@@ -61,20 +56,17 @@ ${'='.repeat(80)}
     console.error(`[ERROR LOGGED] ${context}:`, error?.message || String(error))
     console.error(`Log file: ${logFile}`)
     
-    return logFile
-    
   } catch (loggingError) {
     // If logging fails, at least log to console
     console.error('Failed to write error log:', loggingError)
     console.error('Original error:', error)
-    return null
   }
 }
 
 /**
  * Log order submission error with full context
  */
-export function logOrderError(orderNumber: string, step: string, error: any, orderData?: any) {
+export async function logOrderError(orderNumber: string, step: string, error: any, orderData?: any): Promise<void> {
   return logError(
     `Order Submission [${orderNumber}] - ${step}`,
     error,
@@ -94,7 +86,7 @@ export function logOrderError(orderNumber: string, step: string, error: any, ord
 /**
  * Log email sending error
  */
-export function logEmailError(recipient: string, subject: string, error: any) {
+export async function logEmailError(recipient: string, subject: string, error: any): Promise<void> {
   return logError(
     'Email Sending',
     error,
