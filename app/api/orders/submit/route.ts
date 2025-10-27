@@ -48,8 +48,8 @@ export async function POST(request: NextRequest) {
     // Fetch configuration (for emails and PDF)
     const config = await fetchMergedConfigForStore(body.storeSlug || '')
     
-    // Process order asynchronously (don't wait for completion)
-    console.log(`[${fullOrderNumber}] Starting async order processing...`)
+    // Process order and WAIT for completion (Vercel serverless needs this)
+    console.log(`[${fullOrderNumber}] Starting order processing...`)
     console.log(`[${fullOrderNumber}] Config loaded:`, {
       hasBusinessName: !!(config['Business Name'] || config.Business_Name),
       hasContactEmail: !!(config.ContactMeEmail || config.Contact_Me_Email),
@@ -59,17 +59,20 @@ export async function POST(request: NextRequest) {
       hasGmailPassword: !!process.env.GMAIL_APP_PASSWORD,
     })
     
-    processOrderAsync(order, config).catch(error => {
-      console.error(`[${fullOrderNumber}] ❌ Async order processing failed:`, error)
-      console.error('Error stack:', error.stack)
+    try {
+      await processOrderAsync(order, config)
+      console.log(`[${fullOrderNumber}] ✅ Order processing complete`)
+    } catch (error) {
+      console.error(`[${fullOrderNumber}] ❌ Order processing failed:`, error)
+      console.error('Error stack:', error instanceof Error ? error.stack : 'N/A')
       console.error('Error details:', {
-        name: error.name,
-        message: error.message,
-        code: (error as any).code,
+        name: error instanceof Error ? error.name : 'Unknown',
+        message: error instanceof Error ? error.message : String(error),
+        code: (error as any)?.code,
       })
       
       // Log error to file
-      logOrderError(fullOrderNumber, 'Async Processing', error, order).catch(logErr => {
+      logOrderError(fullOrderNumber, 'Order Processing', error, order).catch(logErr => {
         console.error('Failed to log error:', logErr)
       })
       
@@ -81,10 +84,10 @@ export async function POST(request: NextRequest) {
           console.error('Failed to log email error:', logErr)
         })
       })
-    })
+    }
     
-    // Return success immediately to user
-    return NextResponse.json({ 
+    // Return success to user (after processing completes)
+    return NextResponse.json({
       success: true,
       orderNumber: shortOrderNumber,
     })
@@ -113,10 +116,10 @@ export async function POST(request: NextRequest) {
 
 // DEBUG FLAGS - Set to true/false to enable/disable each step
 const DEBUG_FLAGS = {
-  ENABLE_GOOGLE_SHEETS: false,  // ⏭️  TEMPORARILY DISABLED - Testing emails
-  ENABLE_PDF_GENERATION: true,  // ✅ Enable PDF generation
-  ENABLE_CUSTOMER_EMAIL: true,  // ✅ Testing customer email
-  ENABLE_ADMIN_EMAIL: true,     // ✅ Testing admin email
+  ENABLE_GOOGLE_SHEETS: true,   // ✅ Working!
+  ENABLE_PDF_GENERATION: true,  // ✅ Working!
+  ENABLE_CUSTOMER_EMAIL: true,  // ✅ Enable customer email
+  ENABLE_ADMIN_EMAIL: true,     // ✅ Enable admin email
 }
 
 /**
