@@ -50,18 +50,36 @@ export async function POST(request: NextRequest) {
     
     // Process order asynchronously (don't wait for completion)
     console.log(`[${fullOrderNumber}] Starting async order processing...`)
+    console.log(`[${fullOrderNumber}] Config loaded:`, {
+      hasBusinessName: !!(config['Business Name'] || config.Business_Name),
+      hasContactEmail: !!(config.ContactMeEmail || config.Contact_Me_Email),
+      hasTechSupportEmail: !!('Tech_Support_Email' in config ? config.Tech_Support_Email : undefined),
+      hasVenmo: !!config.Venmo_Handle,
+      hasGmailUser: !!process.env.GMAIL_USER,
+      hasGmailPassword: !!process.env.GMAIL_APP_PASSWORD,
+    })
+    
     processOrderAsync(order, config).catch(error => {
       console.error(`[${fullOrderNumber}] ❌ Async order processing failed:`, error)
       console.error('Error stack:', error.stack)
+      console.error('Error details:', {
+        name: error.name,
+        message: error.message,
+        code: (error as any).code,
+      })
       
       // Log error to file
-      logOrderError(fullOrderNumber, 'Async Processing', error, order)
+      logOrderError(fullOrderNumber, 'Async Processing', error, order).catch(logErr => {
+        console.error('Failed to log error:', logErr)
+      })
       
       // Send tech support email about the failure
       sendTechSupportEmail(error, order, config).catch(err => {
         console.error('Failed to send tech support email:', err)
         const techEmail = 'Tech_Support_Email' in config ? String(config.Tech_Support_Email || 'unknown') : 'unknown'
-        logEmailError(techEmail, 'Tech Support Error Notification', err)
+        logEmailError(techEmail, 'Tech Support Error Notification', err).catch(logErr => {
+          console.error('Failed to log email error:', logErr)
+        })
       })
     })
     
@@ -100,26 +118,34 @@ async function processOrderAsync(
   order: Order & { orderNumber: string; shortOrderNumber: string },
   config: any
 ) {
+  const stepTimings: any = {}
+  const startTime = Date.now()
+  
   try {
     // Step 1: Generate Invoice PDF (using professional template by default)
-    console.log(`[${order.orderNumber}] Generating invoice PDF...`)
+    console.log(`[${order.orderNumber}] Step 1: Generating invoice PDF...`)
+    const step1Start = Date.now()
     const pdfPath = await generateInvoicePDF(order, 'professional', config)
+    stepTimings.pdfGeneration = Date.now() - step1Start
     const invoiceFilename = pdfPath.split(/[\\/]/).pop() || 'invoice.pdf' // Extract filename from path
-    console.log(`[${order.orderNumber}] ✓ PDF generated: ${pdfPath}`)
+    console.log(`[${order.orderNumber}] ✓ PDF generated in ${stepTimings.pdfGeneration}ms: ${pdfPath}`)
     
     // Add invoice filename to order object for Google Sheets
     ;(order as any).invoiceFilename = invoiceFilename
     
     // Step 2: Submit to Google Sheets (now with invoice filename)
-    console.log(`[${order.orderNumber}] Submitting to Google Sheets...`)
+    console.log(`[${order.orderNumber}] Step 2: Submitting to Google Sheets...`)
+    const step2Start = Date.now()
     const sheetResult = await submitOrder(order)
+    stepTimings.googleSheets = Date.now() - step2Start
     if (!sheetResult.success) {
       throw new Error(`Google Sheets submission failed: ${sheetResult.error}`)
     }
-    console.log(`[${order.orderNumber}] ✓ Saved to Google Sheets`)
+    console.log(`[${order.orderNumber}] ✓ Saved to Google Sheets in ${stepTimings.googleSheets}ms`)
     
     // Step 3: Send customer confirmation email with PDF attachment
-    console.log(`[${order.orderNumber}] Sending customer email...`)
+    console.log(`[${order.orderNumber}] Step 3: Sending customer email to ${order.contactInfo.email}...`)
+    const step3Start = Date.now()
     const customerEmailHtml = generateCustomerEmail({
       customerName: `${order.contactInfo.parentFirstName} ${order.contactInfo.parentLastName}`,
       shortOrderNumber: order.shortOrderNumber,
@@ -147,12 +173,15 @@ async function processOrderAsync(
         path: pdfPath,
       }],
     })
-    console.log(`[${order.orderNumber}] ✓ Customer email sent`)
+    stepTimings.customerEmail = Date.now() - step3Start
+    console.log(`[${order.orderNumber}] ✓ Customer email sent in ${stepTimings.customerEmail}ms`)
     
     // Step 4: Send admin notification email with PDF attachment
-    console.log(`[${order.orderNumber}] Sending admin notification...`)
+    console.log(`[${order.orderNumber}] Step 4: Sending admin notification...`)
+    const step4Start = Date.now()
     const adminEmail = config.ContactMeEmail || config.Contact_Me_Email
     if (adminEmail) {
+      console.log(`[${order.orderNumber}] Admin email: ${adminEmail}`)
       const adminEmailHtml = generateAdminEmail({
         customerName: `${order.contactInfo.parentFirstName} ${order.contactInfo.parentLastName}`,
         customerEmail: order.contactInfo.email,
@@ -180,10 +209,15 @@ async function processOrderAsync(
           path: pdfPath,
         }],
       })
-      console.log(`[${order.orderNumber}] ✓ Admin notification sent`)
+      stepTimings.adminEmail = Date.now() - step4Start
+      console.log(`[${order.orderNumber}] ✓ Admin notification sent in ${stepTimings.adminEmail}ms`)
+    } else {
+      console.log(`[${order.orderNumber}] ⚠️ No admin email configured, skipping admin notification`)
     }
     
-    console.log(`[${order.orderNumber}] ✅ Order processing complete`)
+    stepTimings.total = Date.now() - startTime
+    console.log(`[${order.orderNumber}] ✅ Order processing complete in ${stepTimings.total}ms`)
+    console.log(`[${order.orderNumber}] Timings breakdown:`, stepTimings)
     
   } catch (error) {
     console.error(`[${order.orderNumber}] ❌ Order processing failed:`, error)
