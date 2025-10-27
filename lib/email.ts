@@ -386,7 +386,8 @@ export async function sendEmail(options: {
   html: string
   attachments?: Array<{
     filename: string
-    path: string
+    path?: string
+    content?: Buffer
   }>
 }): Promise<void> {
   const transporter = await createTransporter()

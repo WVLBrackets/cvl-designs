@@ -7,7 +7,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { submitOrder, fetchConfiguration, fetchMergedConfigForStore } from '@/lib/googleSheets'
 import { getEnvironment } from '@/lib/config'
 import { generateOrderNumber, getShortOrderNumber } from '@/lib/orderNumber'
-import { generateInvoicePDF } from '@/lib/invoiceGenerator'
+import { generateInvoicePDFBuffer } from '@/lib/invoiceGenerator'
 import { sendEmail } from '@/lib/email'
 import { generateCustomerEmail, generateAdminEmail, generateTechSupportEmail } from '@/lib/emailTemplates'
 import { logOrderError, logEmailError } from '@/lib/errorLogger'
@@ -122,13 +122,17 @@ async function processOrderAsync(
   const startTime = Date.now()
   
   try {
-    // Step 1: Generate Invoice PDF (using professional template by default)
+    // Step 1: Generate Invoice PDF as Buffer (using professional template by default)
     console.log(`[${order.orderNumber}] Step 1: Generating invoice PDF...`)
     const step1Start = Date.now()
-    const pdfPath = await generateInvoicePDF(order, 'professional', config)
+    const pdfBuffer = await generateInvoicePDFBuffer(order, 'professional', config)
     stepTimings.pdfGeneration = Date.now() - step1Start
-    const invoiceFilename = pdfPath.split(/[\\/]/).pop() || 'invoice.pdf' // Extract filename from path
-    console.log(`[${order.orderNumber}] ✓ PDF generated in ${stepTimings.pdfGeneration}ms: ${pdfPath}`)
+    
+    // Generate filename for tracking
+    const customerLastName = order.contactInfo.parentLastName.replace(/[^a-zA-Z0-9]/g, '')
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-').replace('T', '_').split('Z')[0]
+    const invoiceFilename = `Invoice_${order.orderNumber}_${customerLastName}_${timestamp}_${order.environment}.pdf`
+    console.log(`[${order.orderNumber}] ✓ PDF generated in ${stepTimings.pdfGeneration}ms (${pdfBuffer.length} bytes)`)
     
     // Add invoice filename to order object for Google Sheets
     ;(order as any).invoiceFilename = invoiceFilename
@@ -170,7 +174,7 @@ async function processOrderAsync(
       html: customerEmailHtml,
       attachments: [{
         filename: `Invoice_${order.shortOrderNumber}.pdf`,
-        path: pdfPath,
+        content: pdfBuffer,
       }],
     })
     stepTimings.customerEmail = Date.now() - step3Start
@@ -206,7 +210,7 @@ async function processOrderAsync(
         html: adminEmailHtml,
         attachments: [{
           filename: `Invoice_${order.shortOrderNumber}.pdf`,
-          path: pdfPath,
+          content: pdfBuffer,
         }],
       })
       stepTimings.adminEmail = Date.now() - step4Start

@@ -36,7 +36,61 @@ interface InvoiceData {
 }
 
 /**
- * Generate an invoice PDF
+ * Generate an invoice PDF as a Buffer (for email attachments)
+ * @param order - The order data
+ * @param template - Which template style to use
+ * @param config - Site configuration
+ * @returns Buffer containing the PDF data
+ */
+export async function generateInvoicePDFBuffer(
+  order: Order & { orderNumber: string; shortOrderNumber: string },
+  template: InvoiceTemplate,
+  config: any
+): Promise<Buffer> {
+  const invoiceData: InvoiceData = {
+    orderNumber: order.orderNumber,
+    shortOrderNumber: order.shortOrderNumber,
+    date: new Date().toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+    }),
+    customer: {
+      name: `${order.contactInfo.parentFirstName} ${order.contactInfo.parentLastName}`,
+      email: order.contactInfo.email,
+      phone: order.contactInfo.phoneNumber,
+    },
+    items: order.items,
+    subtotal: order.totalAmount,
+    total: order.totalAmount,
+    storeName: order.storeSlug?.toUpperCase() || 'STORE',
+    businessName: config['Business Name'] || config.Business_Name || config.BusinessName || 'CVL Designs',
+    headerLogo: config.Header_Logo,
+    storeLogo: config.Store_Header_Logo,
+    paymentInstructions: {
+      venmo: config.Venmo_Handle,
+      cashapp: config.CashApp_Handle,
+      zelle: config.Zelle_Email,
+    },
+    environment: process.env.NODE_ENV === 'production' ? 'PROD' : 'DEV',
+    invoiceFooter: config.Invoice_Footer || config['Invoice Footer'],
+  }
+
+  // Generate PDF based on template and return as Buffer
+  switch (template) {
+    case 'minimal':
+      return await generateMinimalTemplateBuffer(invoiceData)
+    case 'professional':
+      return await generateProfessionalTemplateBuffer(invoiceData)
+    case 'detailed':
+      return await generateDetailedTemplateBuffer(invoiceData)
+    default:
+      return await generateProfessionalTemplateBuffer(invoiceData)
+  }
+}
+
+/**
+ * Generate an invoice PDF (legacy function - now writes to disk if needed)
  * @param order - The order data
  * @param template - Which template style to use
  * @param config - Site configuration
@@ -102,6 +156,22 @@ export async function generateInvoicePDF(
   }
 
   return filepath
+}
+
+/**
+ * Template A: Clean & Minimal - Buffer version
+ */
+async function generateMinimalTemplateBuffer(data: InvoiceData): Promise<Buffer> {
+  // For now, just use the professional template
+  return generateProfessionalTemplateBuffer(data)
+}
+
+/**
+ * Template C: Detailed & Structured - Buffer version
+ */
+async function generateDetailedTemplateBuffer(data: InvoiceData): Promise<Buffer> {
+  // For now, just use the professional template
+  return generateProfessionalTemplateBuffer(data)
 }
 
 /**
@@ -180,6 +250,142 @@ async function generateMinimalTemplate(filepath: string, data: InvoiceData): Pro
     doc.end()
     stream.on('finish', () => resolve())
     stream.on('error', reject)
+  })
+}
+
+/**
+ * Template B: Professional with Branding - Buffer version for serverless
+ */
+async function generateProfessionalTemplateBuffer(data: InvoiceData): Promise<Buffer> {
+  return new Promise((resolve, reject) => {
+    const doc = new PDFDocument({ margin: 50 })
+    const buffers: Buffer[] = []
+
+    // Collect PDF data in buffers
+    doc.on('data', (chunk) => buffers.push(chunk))
+    doc.on('end', () => resolve(Buffer.concat(buffers)))
+    doc.on('error', reject)
+
+    // Get logo paths
+    const headerLogoPath = path.join(process.cwd(), 'public', 'images', 'brand', data.headerLogo || 'VL Design Logo - Trimmed.png')
+    const storeLogoPath = path.join(process.cwd(), 'public', 'images', 'brand', data.storeLogo || '')
+
+    // Top left: Header logo (60x60)
+    let logoY = 50
+    if (fs.existsSync(headerLogoPath)) {
+      doc.image(headerLogoPath, 50, logoY, { width: 60, height: 60 })
+    }
+
+    // Top left: Business info (3 lines next to logo, with one line of whitespace above)
+    const textX = 120
+    const textStartY = logoY + 13 // Add one line of whitespace (13px)
+    doc.fontSize(14).fillColor('#000000').text(data.businessName, textX, textStartY, { width: 350 })
+    doc.fontSize(10).text(`${data.storeName} - Order #${data.shortOrderNumber}`, textX, textStartY + 18, { width: 350 })
+    doc.fontSize(9).fillColor('#666666').text(data.date, textX, textStartY + 33, { width: 350 })
+
+    // Top right: Store logo (60x60)
+    if (data.storeLogo && fs.existsSync(storeLogoPath)) {
+      doc.image(storeLogoPath, 495, logoY, { width: 60, height: 60 })
+    }
+
+    // Horizontal black line
+    const lineY = logoY + 70
+    doc.moveTo(50, lineY).lineTo(545, lineY).lineWidth(2).stroke('#000000')
+
+    // Bill To box
+    const billToY = lineY + 15
+    doc.rect(50, billToY, 250, 70).stroke('#000000')
+    doc.fontSize(9).fillColor('#666666').text('BILL TO', 60, billToY + 8)
+    doc.fontSize(11).fillColor('#000000').text(data.customer.name, 60, billToY + 23)
+    doc.fontSize(9).text(data.customer.email, 60, billToY + 38)
+    doc.text(data.customer.phone, 60, billToY + 51)
+
+    // Detailed cost breakdown (compressed)
+    let currentY = billToY + 90
+    doc.fontSize(11).fillColor('#000000').text('ORDER DETAILS', 50, currentY)
+    currentY += 20
+
+    data.items.forEach((item, index) => {
+      const itemTotal = item.totalPrice * item.quantity
+      const bgColor = index % 2 === 0 ? '#f3f4f6' : '#ffffff'
+      
+      // Calculate the number of lines dynamically
+      let lineCount = 1 // Product name line
+      if (item.quantity > 1) lineCount += 1 // Quantity line
+      lineCount += item.designOptions.length // Design option lines
+      lineCount += item.customizationOptions.length // Customization option lines
+      
+      // Calculate row height based on actual line count
+      const baseHeight = 18
+      const lineHeight = 13
+      const topPadding = 5
+      const bottomPadding = 5
+      const rowHeight = topPadding + baseHeight + ((lineCount - 1) * lineHeight) + bottomPadding
+      
+      // Background for entire row
+      doc.rect(50, currentY, 495, rowHeight).fillAndStroke(bgColor, bgColor)
+      
+      // Product name and total
+      doc.fontSize(10).fillColor('#000000')
+      doc.text(`${item.productName} (${item.size})`, 60, currentY + topPadding, { width: 350, continued: false })
+      doc.text(`$${itemTotal.toFixed(2)}`, 480, currentY + topPadding, { width: 55, align: 'right' })
+      
+      let textY = currentY + topPadding + 14 // Start below product name
+      
+      // Quantity info (if > 1)
+      if (item.quantity > 1) {
+        doc.fontSize(8).fillColor('#666666')
+        doc.text(`Qty: ${item.quantity} × $${item.totalPrice.toFixed(2)}`, 60, textY)
+        textY += lineHeight
+      }
+      
+      // Options (same background color, closer to parent)
+      doc.fontSize(8).fillColor('#666666')
+      
+      item.designOptions.forEach((opt) => {
+        const optText = `  • ${opt.title}${opt.price > 0 ? ` (+$${opt.price.toFixed(2)})` : ''}`
+        doc.text(optText, 60, textY, { width: 470 })
+        textY += lineHeight
+      })
+      
+      item.customizationOptions.forEach((opt) => {
+        let optText = `  • ${opt.title}${opt.price > 0 ? ` (+$${opt.price.toFixed(2)})` : ''}`
+        if (opt.customName) optText += ` - ${opt.customName}`
+        if (opt.customNumber) optText += ` #${opt.customNumber}`
+        doc.text(optText, 60, textY, { width: 470 })
+        textY += lineHeight
+      })
+      
+      currentY += rowHeight
+    })
+
+    // Total due (full width, slightly darker gray, larger font)
+    currentY += 5
+    doc.rect(50, currentY, 495, 35).fillAndStroke('#d1d5db', '#d1d5db')
+    doc.fontSize(13).fillColor('#000000').text('TOTAL DUE', 60, currentY + 10)
+    doc.fontSize(16).text(`$${data.total.toFixed(2)}`, 50, currentY + 9, { width: 485, align: 'right' })
+    
+    currentY += 45
+
+    // Payment Options image
+    const paymentImagePath = path.join(process.cwd(), 'public', 'images', 'brand', 'Payment Options.jpg')
+    if (fs.existsSync(paymentImagePath)) {
+      // Center the image and scale it appropriately
+      doc.image(paymentImagePath, 50, currentY, { width: 495, align: 'center' })
+      currentY += 210 // Approximate height of payment image + spacing
+    }
+
+    // Invoice footer message (centered, italics, below payment image)
+    if (data.invoiceFooter) {
+      doc.fontSize(9).fillColor('#666666').font('Helvetica-Oblique')
+      doc.text(data.invoiceFooter, 50, currentY, { 
+        width: 495, 
+        align: 'center'
+      })
+      doc.font('Helvetica') // Reset to normal font
+    }
+
+    doc.end()
   })
 }
 
