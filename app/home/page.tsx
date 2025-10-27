@@ -7,10 +7,32 @@ import Image from 'next/image'
 import Link from 'next/link'
 
 export default async function HomePage() {
-  const [stores, config] = await Promise.all([
-    fetchStores(),
-    fetchConfiguration(),
-  ])
+  let stores: any[] = []
+  let config: any = {}
+  
+  try {
+    [stores, config] = await Promise.all([
+      fetchStores(),
+      fetchConfiguration(),
+    ])
+  } catch (error) {
+    console.error('Error fetching data:', error)
+    // Return error page
+    return (
+      <main className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100 flex items-center justify-center">
+        <div className="bg-white rounded-lg shadow-lg p-8 max-w-md">
+          <h1 className="text-2xl font-bold text-red-600 mb-4">Configuration Error</h1>
+          <p className="text-gray-700 mb-4">Unable to load store configuration. Please check:</p>
+          <ul className="list-disc list-inside text-sm text-gray-600 space-y-2">
+            <li>Google Sheets environment variables are set</li>
+            <li>Service account has access to sheets</li>
+            <li>Sheet IDs are correct</li>
+          </ul>
+          <p className="text-xs text-gray-500 mt-4">Error: {error instanceof Error ? error.message : 'Unknown error'}</p>
+        </div>
+      </main>
+    )
+  }
 
   const getCfgStr = (key: string) => (typeof config[key] === 'string' ? (config[key] as string).trim() : '')
   const headerTitle = getCfgStr('Header_Title')
