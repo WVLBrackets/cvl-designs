@@ -400,65 +400,9 @@ export async function submitOrder(order: Order): Promise<{ success: boolean; err
     const spreadsheetId = getSheetId('orders')
     console.log('[submitOrder] Target spreadsheet ID:', spreadsheetId)
     
-    // Check if headers exist with timeout
-    console.log('[submitOrder] Checking for existing headers...')
-    let checkResponse
-    try {
-      // Add a 5-second timeout to prevent hanging
-      const checkPromise = sheets.spreadsheets.values.get({
-        spreadsheetId,
-        range: 'A1:T1', // Updated to match our full range
-      })
-      
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Header check timeout after 5s')), 5000)
-      )
-      
-      checkResponse = await Promise.race([checkPromise, timeoutPromise]) as any
-      console.log('[submitOrder] ✓ Headers checked, found:', checkResponse.data?.values?.length || 0, 'rows')
-    } catch (headerError: any) {
-      console.log('[submitOrder] ⚠️ Error checking headers:', headerError?.message || String(headerError))
-      console.log('[submitOrder] Assuming sheet is empty, will create headers...')
-      // Assume no headers if check fails
-      checkResponse = { data: { values: [] } }
-    }
-    
-    // Add headers if needed
-    if (!checkResponse.data.values || checkResponse.data.values.length === 0) {
-      console.log('[submitOrder] No headers found, creating them...')
-      await sheets.spreadsheets.values.update({
-        spreadsheetId,
-        range: 'A1:T1',
-        valueInputOption: 'RAW',
-        requestBody: {
-          values: [[
-            'Order Number',
-            'Order Date',
-            'Environment',
-            'Store',
-            'Email',
-            'Parent First Name',
-            'Parent Last Name',
-            'Phone Number',
-            'Product Name',
-            'Size',
-            'Quantity',
-            'Item Price',
-            'Design Options',
-            'Design Options Cost',
-            'Customization Options',
-            'Customization Details',
-            'Customization Options Cost',
-            'Item Total',
-            'Order Total',
-            'Invoice Filename',
-          ]],
-        },
-      })
-      console.log('[submitOrder] ✓ Headers created')
-    } else {
-      console.log('[submitOrder] Headers already exist')
-    }
+    // TEMPORARY: Skip header check entirely and just append
+    console.log('[submitOrder] ⚠️ SKIPPING header check (DEBUG MODE)')
+    console.log('[submitOrder] Assuming headers exist in sheet...')
     
     // Prepare rows for each item (repeat rows for quantities > 1)
     console.log('[submitOrder] Preparing order rows...')
