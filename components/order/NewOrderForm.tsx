@@ -639,6 +639,9 @@ export default function NewOrderForm({
         accentColor={accentColor}
       />
       
+      {/* Scroll anchor - positioned right after customer info */}
+      <div id="catalog-scroll-anchor"></div>
+      
       {/* Add Item Flow */}
       {step === 'adding-item' && (
         <div 
@@ -676,10 +679,10 @@ export default function NewOrderForm({
               selectedProduct={currentItem.product}
               onSelect={(product) => {
                 setCurrentItem({ ...currentItem, product, size: '', selectedDesignOptions: [], selectedCustomizationOptions: [], customizationData: [] })
-                // Scroll to product section when detail page is shown
+                // Scroll to catalog anchor (after customer info, before product section)
                 requestAnimationFrame(() => {
                   requestAnimationFrame(() => {
-                    const element = document.getElementById('product-section')
+                    const element = document.getElementById('catalog-scroll-anchor')
                     if (element) {
                       const yOffset = -20 // 20px above the element
                       const y = element.getBoundingClientRect().top + window.pageYOffset + yOffset
@@ -781,10 +784,10 @@ export default function NewOrderForm({
               // Clear submission status when starting a new order
               setSubmitStatus(null)
               setHasSubmittedOrder(false)
-              // Scroll to product catalog
+              // Scroll to catalog anchor (after customer info, before product section)
               requestAnimationFrame(() => {
                 requestAnimationFrame(() => {
-                  const element = document.getElementById('product-section')
+                  const element = document.getElementById('catalog-scroll-anchor')
                   if (element) {
                     const yOffset = -20 // 20px above the element
                     const y = element.getBoundingClientRect().top + window.pageYOffset + yOffset
