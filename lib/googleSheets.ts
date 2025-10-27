@@ -400,17 +400,25 @@ export async function submitOrder(order: Order): Promise<{ success: boolean; err
     const spreadsheetId = getSheetId('orders')
     console.log('[submitOrder] Target spreadsheet ID:', spreadsheetId)
     
-    // Check if headers exist
+    // Check if headers exist with timeout
     console.log('[submitOrder] Checking for existing headers...')
     let checkResponse
     try {
-      checkResponse = await sheets.spreadsheets.values.get({
+      // Add a 5-second timeout to prevent hanging
+      const checkPromise = sheets.spreadsheets.values.get({
         spreadsheetId,
         range: 'A1:T1', // Updated to match our full range
       })
-      console.log('[submitOrder] ✓ Headers checked, found:', checkResponse.data.values?.length || 0, 'rows')
-    } catch (headerError) {
-      console.log('[submitOrder] ⚠️ Error checking headers (sheet might be empty):', headerError)
+      
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Header check timeout after 5s')), 5000)
+      )
+      
+      checkResponse = await Promise.race([checkPromise, timeoutPromise]) as any
+      console.log('[submitOrder] ✓ Headers checked, found:', checkResponse.data?.values?.length || 0, 'rows')
+    } catch (headerError: any) {
+      console.log('[submitOrder] ⚠️ Error checking headers:', headerError?.message || String(headerError))
+      console.log('[submitOrder] Assuming sheet is empty, will create headers...')
       // Assume no headers if check fails
       checkResponse = { data: { values: [] } }
     }
