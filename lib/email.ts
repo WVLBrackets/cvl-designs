@@ -390,7 +390,10 @@ export async function sendEmail(options: {
     content?: Buffer
   }>
 }): Promise<void> {
+  console.log('[sendEmail] Starting email send to:', options.to)
+  
   const transporter = await createTransporter()
+  console.log('[sendEmail] Transporter created')
   
   const mailOptions = {
     from: `"CVL Designs" <${process.env.GMAIL_USER}>`,
@@ -400,7 +403,21 @@ export async function sendEmail(options: {
     attachments: options.attachments,
   }
   
-  await transporter.sendMail(mailOptions)
+  console.log('[sendEmail] Sending mail...')
+  
+  // Add 5-second timeout
+  const sendPromise = transporter.sendMail(mailOptions)
+  const timeoutPromise = new Promise((_, reject) => 
+    setTimeout(() => reject(new Error('Email send timeout after 5s')), 5000)
+  )
+  
+  try {
+    await Promise.race([sendPromise, timeoutPromise])
+    console.log('[sendEmail] ✓ Email sent successfully')
+  } catch (error: any) {
+    console.error('[sendEmail] ❌ Email send failed/timeout:', error?.message)
+    throw error
+  }
 }
 
 /**
