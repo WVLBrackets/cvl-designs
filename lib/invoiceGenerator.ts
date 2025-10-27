@@ -266,26 +266,12 @@ async function generateProfessionalTemplateBuffer(data: InvoiceData): Promise<Bu
     doc.on('end', () => resolve(Buffer.concat(buffers)))
     doc.on('error', reject)
 
-    // Add environment watermark for non-production
+    // Check environment for watermark (we'll add it at the end)
     const vercelEnv = process.env.VERCEL_ENV
     const nodeEnv = process.env.NODE_ENV
-    // Only check VERCEL_ENV - NODE_ENV is always 'production' in builds
     const isProduction = vercelEnv === 'production'
     
     console.log('[PDF] Environment check:', { vercelEnv, nodeEnv, isProduction })
-    
-    if (!isProduction) {
-      const envLabel = (vercelEnv || nodeEnv || 'DEV').toUpperCase()
-      console.log('[PDF] Adding watermark:', envLabel)
-      doc.save()
-      doc.rotate(-45, { origin: [306, 400] })
-      doc.fontSize(60).fillColor('#ff0000').opacity(0.1)
-      doc.text(envLabel, 0, 400, {
-        align: 'center',
-        width: 612
-      })
-      doc.restore()
-    }
 
     // Get logo paths
     const headerLogoPath = path.join(process.cwd(), 'public', 'images', 'brand', data.headerLogo || 'VL Design Logo - Trimmed.png')
@@ -404,6 +390,35 @@ async function generateProfessionalTemplateBuffer(data: InvoiceData): Promise<Bu
         align: 'center'
       })
       doc.font('Helvetica') // Reset to normal font
+    }
+
+    // Add environment watermark on all pages (drawn last so it's on top)
+    if (!isProduction) {
+      const envLabel = (vercelEnv || nodeEnv || 'DEV').toUpperCase()
+      console.log('[PDF] Adding watermark:', envLabel)
+      
+      // Get page range
+      const range = doc.bufferedPageRange()
+      
+      for (let i = 0; i < range.count; i++) {
+        doc.switchToPage(i)
+        
+        // Save the current state
+        doc.save()
+        
+        // Apply rotation and draw watermark
+        doc.rotate(-45, { origin: [306, 400] })
+        doc.fontSize(80)
+        doc.fillColor('#ff0000')
+        doc.opacity(0.15)
+        doc.text(envLabel, 0, 400, {
+          align: 'center',
+          width: 612
+        })
+        
+        // Restore state
+        doc.restore()
+      }
     }
 
     doc.end()
