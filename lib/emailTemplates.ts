@@ -221,7 +221,7 @@ export function generateCustomerEmail(data: CustomerEmailData): string {
 export function generateAdminEmail(data: AdminEmailData): string {
   const itemsHtml = data.items.map((item, index) => {
     const itemTotal = item.totalPrice * item.quantity
-    const details = []
+    const details: string[] = []
     
     item.designOptions.forEach(opt => {
       details.push(`${opt.title}${opt.price > 0 ? ` (+$${opt.price})` : ''}`)
