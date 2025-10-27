@@ -576,6 +576,10 @@ export default function NewOrderForm({
       if (result.success && result.orderNumber) {
         setOrderNumber(result.orderNumber)
         console.log(`Order #${result.orderNumber} submitted successfully`)
+        // Scroll to submission status message
+        setTimeout(() => {
+          document.getElementById('submission-status')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+        }, 100)
       } else {
         console.error('Order submission failed:', result.error)
       }
@@ -601,6 +605,7 @@ export default function NewOrderForm({
       {/* Submit Status - Show at top after submission */}
       {submitStatus && (
         <div
+          id="submission-status"
           className={`rounded-lg p-4 text-center ${
             submitStatus.type === 'success' ? 'bg-green-50 text-green-800' : 'bg-red-50 text-red-800'
           }`}
@@ -654,13 +659,21 @@ export default function NewOrderForm({
           </div>
           
           {/* Step 1: Select Product */}
-          <ProductSelector
-            products={products}
-            categories={categories}
-            selectedProduct={currentItem.product}
-            onSelect={(product) => setCurrentItem({ ...currentItem, product, size: '', selectedDesignOptions: [], selectedCustomizationOptions: [], customizationData: [] })}
-            detailMode={!!currentItem.product}
-          />
+          <div id="product-section">
+            <ProductSelector
+              products={products}
+              categories={categories}
+              selectedProduct={currentItem.product}
+              onSelect={(product) => {
+                setCurrentItem({ ...currentItem, product, size: '', selectedDesignOptions: [], selectedCustomizationOptions: [], customizationData: [] })
+                // Scroll to product section when detail page is shown
+                setTimeout(() => {
+                  document.getElementById('product-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+                }, 100)
+              }}
+              detailMode={!!currentItem.product}
+            />
+          </div>
           
           {/* Step 2: Select Size */}
           {currentItem.product && (
@@ -751,6 +764,10 @@ export default function NewOrderForm({
               // Clear submission status when starting a new order
               setSubmitStatus(null)
               setHasSubmittedOrder(false)
+              // Scroll to product catalog
+              setTimeout(() => {
+                document.getElementById('product-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+              }, 100)
             }}
             disabled={!isCustomerInfoValid()}
             className="flex-1 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded-lg font-bold text-lg transition-colors"
