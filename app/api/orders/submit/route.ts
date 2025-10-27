@@ -113,10 +113,10 @@ export async function POST(request: NextRequest) {
 
 // DEBUG FLAGS - Set to true/false to enable/disable each step
 const DEBUG_FLAGS = {
-  ENABLE_GOOGLE_SHEETS: true,   // ✅ Working!
+  ENABLE_GOOGLE_SHEETS: false,  // ⏭️  TEMPORARILY DISABLED - Testing emails
   ENABLE_PDF_GENERATION: true,  // ✅ Enable PDF generation
-  ENABLE_CUSTOMER_EMAIL: true,  // ✅ Enable customer email
-  ENABLE_ADMIN_EMAIL: true,     // ✅ Enable admin email
+  ENABLE_CUSTOMER_EMAIL: true,  // ✅ Testing customer email
+  ENABLE_ADMIN_EMAIL: true,     // ✅ Testing admin email
 }
 
 /**
