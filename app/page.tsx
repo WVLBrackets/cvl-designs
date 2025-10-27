@@ -18,7 +18,7 @@ import Image from 'next/image'
 export default async function Home({
   searchParams,
 }: {
-  searchParams: { store?: string }
+  searchParams: { store?: string; error?: string }
 }) {
   // Get store from URL query param
   const storeSlug = searchParams.store
@@ -26,7 +26,16 @@ export default async function Home({
   // If no store is specified, we'll handle it on the client side
   // (checking localStorage and redirecting if needed)
   if (!storeSlug) {
-    return <OrderPageClient />
+    return <OrderPageClient errorMessage={searchParams.error} />
+  }
+
+  // Validate that the store exists
+  const stores = await fetchStores()
+  const validStore = stores.find(s => s.Slug === storeSlug)
+  
+  if (!validStore) {
+    // Invalid store - redirect to home with error
+    return <OrderPageClient errorMessage={`Invalid Store Name: ${storeSlug}`} />
   }
 
   // Fetch all required data (with store-specific filtering and config)

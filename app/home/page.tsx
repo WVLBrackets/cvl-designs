@@ -6,7 +6,11 @@ import { fetchStores, fetchConfiguration } from '@/lib/googleSheets'
 import Image from 'next/image'
 import Link from 'next/link'
 
-export default async function HomePage() {
+export default async function HomePage({
+  searchParams,
+}: {
+  searchParams: { error?: string }
+}) {
   let stores: any[] = []
   let config: any = {}
   
@@ -75,6 +79,13 @@ export default async function HomePage() {
       {/* Store Selector */}
       <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
         <div className="bg-white rounded-lg shadow-lg p-8">
+          {/* Error message banner */}
+          {searchParams.error && (
+            <div className="mb-6 rounded-lg p-4 bg-red-50 border-2 border-red-200">
+              <p className="text-red-800 font-semibold text-center">{searchParams.error}</p>
+            </div>
+          )}
+          
           <div className="flex items-center justify-center gap-3 mb-4">
             <h2 className="text-2xl font-bold text-gray-900 text-center">{homePageTitle}</h2>
             <span className="text-4xl" role="img" aria-label="smiley face">😊</span>
