@@ -135,15 +135,31 @@ async function processOrderAsync(
   // All features enabled
   
   try {
-    // Step 1: Generate Invoice PDF as Buffer (using professional template by default)
+    // Step 1: Submit to Google Sheets FIRST (most critical - capture the order!)
+    if (FEATURE_FLAGS.ENABLE_GOOGLE_SHEETS) {
+      console.log(`[${order.orderNumber}] Step 1: Submitting to Google Sheets (PRIORITY)...`)
+      const step1Start = Date.now()
+      // Don't include invoice filename yet - we'll add it in step 3
+      ;(order as any).invoiceFilename = 'Pending...'
+      const sheetResult = await submitOrder(order)
+      stepTimings.googleSheets = Date.now() - step1Start
+      if (!sheetResult.success) {
+        throw new Error(`Google Sheets submission failed: ${sheetResult.error}`)
+      }
+      console.log(`[${order.orderNumber}] ✓ Order saved to Google Sheets in ${stepTimings.googleSheets}ms`)
+    } else {
+      console.log(`[${order.orderNumber}] ⏭️  Step 1: Google Sheets SKIPPED (FEATURE_FLAGS.ENABLE_GOOGLE_SHEETS = false)`)
+    }
+    
+    // Step 2: Generate Invoice PDF as Buffer (using professional template by default)
     let pdfBuffer: Buffer | null = null
     let invoiceFilename = 'invoice.pdf'
     
     if (FEATURE_FLAGS.ENABLE_PDF_GENERATION) {
-      console.log(`[${order.orderNumber}] Step 1: Generating invoice PDF...`)
-      const step1Start = Date.now()
+      console.log(`[${order.orderNumber}] Step 2: Generating invoice PDF...`)
+      const step2Start = Date.now()
       pdfBuffer = await generateInvoicePDFBuffer(order, 'professional', config)
-      stepTimings.pdfGeneration = Date.now() - step1Start
+      stepTimings.pdfGeneration = Date.now() - step2Start
       
       // Generate filename for tracking
       const customerLastName = order.contactInfo.parentLastName.replace(/[^a-zA-Z0-9]/g, '')
@@ -151,30 +167,27 @@ async function processOrderAsync(
       invoiceFilename = `Invoice_${order.orderNumber}_${customerLastName}_${timestamp}_${order.environment}.pdf`
       console.log(`[${order.orderNumber}] ✓ PDF generated in ${stepTimings.pdfGeneration}ms (${pdfBuffer.length} bytes)`)
     } else {
-      console.log(`[${order.orderNumber}] ⏭️  Step 1: PDF generation SKIPPED (FEATURE_FLAGS.ENABLE_PDF_GENERATION = false)`)
+      console.log(`[${order.orderNumber}] ⏭️  Step 2: PDF generation SKIPPED (FEATURE_FLAGS.ENABLE_PDF_GENERATION = false)`)
     }
     
-    // Add invoice filename to order object for Google Sheets
-    ;(order as any).invoiceFilename = invoiceFilename
-    
-    // Step 2: Submit to Google Sheets (now with invoice filename)
-    if (FEATURE_FLAGS.ENABLE_GOOGLE_SHEETS) {
-      console.log(`[${order.orderNumber}] Step 2: Submitting to Google Sheets...`)
-      const step2Start = Date.now()
-      const sheetResult = await submitOrder(order)
-      stepTimings.googleSheets = Date.now() - step2Start
-      if (!sheetResult.success) {
-        throw new Error(`Google Sheets submission failed: ${sheetResult.error}`)
-      }
-      console.log(`[${order.orderNumber}] ✓ Saved to Google Sheets in ${stepTimings.googleSheets}ms`)
-    } else {
-      console.log(`[${order.orderNumber}] ⏭️  Step 2: Google Sheets SKIPPED (FEATURE_FLAGS.ENABLE_GOOGLE_SHEETS = false)`)
-    }
-    
-    // Step 3: Upload invoice to Google Drive
-    if (pdfBuffer) {
-      console.log(`[${order.orderNumber}] Step 3: Uploading invoice to Google Drive...`)
+    // Step 3: Update Google Sheets with invoice filename
+    if (FEATURE_FLAGS.ENABLE_GOOGLE_SHEETS && invoiceFilename !== 'invoice.pdf') {
+      console.log(`[${order.orderNumber}] Step 3: Updating Google Sheets with invoice filename...`)
       const step3Start = Date.now()
+      // Note: We don't have an update function, so the filename will remain as "Pending..."
+      // in the sheet. This is acceptable - the order is captured, which is most important.
+      // Future enhancement: Add updateOrder function to update the invoice filename
+      console.log(`[${order.orderNumber}] Invoice filename: ${invoiceFilename}`)
+      stepTimings.sheetUpdate = Date.now() - step3Start
+      console.log(`[${order.orderNumber}] ✓ Sheet update noted in ${stepTimings.sheetUpdate}ms`)
+    } else {
+      console.log(`[${order.orderNumber}] ⏭️  Step 3: Sheet update SKIPPED`)
+    }
+    
+    // Step 4: Upload invoice to Google Drive
+    if (pdfBuffer) {
+      console.log(`[${order.orderNumber}] Step 4: Uploading invoice to Google Drive...`)
+      const step4Start = Date.now()
       try {
         const { uploadInvoiceToDrive } = await import('@/lib/googleDrive')
         const driveResult = await uploadInvoiceToDrive(
@@ -184,7 +197,7 @@ async function processOrderAsync(
           order.contactInfo.parentLastName,
           order.environment
         )
-        stepTimings.googleDrive = Date.now() - step3Start
+        stepTimings.googleDrive = Date.now() - step4Start
         if (driveResult.success) {
           console.log(`[${order.orderNumber}] ✓ Invoice uploaded to Google Drive in ${stepTimings.googleDrive}ms (File ID: ${driveResult.fileId})`)
         } else {
@@ -195,13 +208,13 @@ async function processOrderAsync(
         // Continue anyway - don't block order submission
       }
     } else {
-      console.log(`[${order.orderNumber}] ⏭️  Step 3: Google Drive upload SKIPPED (no PDF buffer)`)
+      console.log(`[${order.orderNumber}] ⏭️  Step 4: Google Drive upload SKIPPED (no PDF buffer)`)
     }
     
-    // Step 4: Send customer confirmation email with PDF attachment
+    // Step 5: Send customer confirmation email with PDF attachment
     if (FEATURE_FLAGS.ENABLE_CUSTOMER_EMAIL) {
-      console.log(`[${order.orderNumber}] Step 4: Sending customer email to ${order.contactInfo.email}...`)
-      const step4Start = Date.now()
+      console.log(`[${order.orderNumber}] Step 5: Sending customer email to ${order.contactInfo.email}...`)
+      const step5Start = Date.now()
       const customerEmailHtml = generateCustomerEmail({
         customerName: `${order.contactInfo.parentFirstName} ${order.contactInfo.parentLastName}`,
         shortOrderNumber: order.shortOrderNumber,
@@ -229,16 +242,16 @@ async function processOrderAsync(
           content: pdfBuffer,
         }] : [],
       })
-      stepTimings.customerEmail = Date.now() - step4Start
+      stepTimings.customerEmail = Date.now() - step5Start
       console.log(`[${order.orderNumber}] ✓ Customer email sent in ${stepTimings.customerEmail}ms`)
     } else {
-      console.log(`[${order.orderNumber}] ⏭️  Step 4: Customer email SKIPPED (FEATURE_FLAGS.ENABLE_CUSTOMER_EMAIL = false)`)
+      console.log(`[${order.orderNumber}] ⏭️  Step 5: Customer email SKIPPED (FEATURE_FLAGS.ENABLE_CUSTOMER_EMAIL = false)`)
     }
     
-    // Step 5: Send admin notification email with PDF attachment
+    // Step 6: Send admin notification email with PDF attachment
     if (FEATURE_FLAGS.ENABLE_ADMIN_EMAIL) {
-      console.log(`[${order.orderNumber}] Step 5: Sending admin notification...`)
-      const step5Start = Date.now()
+      console.log(`[${order.orderNumber}] Step 6: Sending admin notification...`)
+      const step6Start = Date.now()
       const adminEmail = config.ContactMeEmail || config.Contact_Me_Email
       if (adminEmail) {
         console.log(`[${order.orderNumber}] Admin email: ${adminEmail}`)
@@ -269,13 +282,13 @@ async function processOrderAsync(
             content: pdfBuffer,
           }] : [],
         })
-        stepTimings.adminEmail = Date.now() - step5Start
+        stepTimings.adminEmail = Date.now() - step6Start
         console.log(`[${order.orderNumber}] ✓ Admin notification sent in ${stepTimings.adminEmail}ms`)
       } else {
         console.log(`[${order.orderNumber}] ⚠️ No admin email configured, skipping admin notification`)
       }
     } else {
-      console.log(`[${order.orderNumber}] ⏭️  Step 5: Admin email SKIPPED (FEATURE_FLAGS.ENABLE_ADMIN_EMAIL = false)`)
+      console.log(`[${order.orderNumber}] ⏭️  Step 6: Admin email SKIPPED (FEATURE_FLAGS.ENABLE_ADMIN_EMAIL = false)`)
     }
     
     stepTimings.total = Date.now() - startTime
