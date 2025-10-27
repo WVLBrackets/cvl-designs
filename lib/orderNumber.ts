@@ -1,27 +1,38 @@
 /**
  * Order Number Generation Utility
- * Format: CVL-[STORE]-[YYYYMMDD]-[SEQUENCE]
- * Sequence is globally unique across all stores and time
+ * Format: CVL-[ENV]-[STORE]-[YYYYMMDD]-[SEQUENCE]
+ * Sequence is unique per environment (PROD/PREVIEW/DEV/LOCAL)
  */
 
 import { getSheetsClient } from './googleSheets'
 import { getSheetId } from './config'
 
 /**
+ * Get the current environment name
+ */
+function getEnvironment(): string {
+  if (process.env.VERCEL_ENV === 'production') return 'PROD'
+  if (process.env.VERCEL_ENV === 'preview') return 'PREVIEW'
+  if (process.env.VERCEL) return 'DEV'
+  return 'LOCAL'
+}
+
+/**
  * Generate a unique order number
  * @param storeSlug - The store slug (e.g., 'phenoms', 'hooks')
- * @returns Full order number (e.g., 'CVL-PHENOMS-20250126-000001')
+ * @returns Full order number (e.g., 'CVL-PROD-PHENOMS-20250127-000001')
  */
 export async function generateOrderNumber(storeSlug: string): Promise<string> {
   const date = new Date()
   const dateStr = date.toISOString().slice(0, 10).replace(/-/g, '') // YYYYMMDD
   const storeUpper = (storeSlug || 'DEFAULT').toUpperCase()
+  const env = getEnvironment()
   
-  // Get the next sequence number from the OrderSequence sheet
-  const sequence = await getNextSequenceNumber()
+  // Get the next sequence number
+  const sequence = await getNextSequenceNumber(env)
   const sequenceStr = sequence.toString().padStart(6, '0')
   
-  return `CVL-${storeUpper}-${dateStr}-${sequenceStr}`
+  return `CVL-${env}-${storeUpper}-${dateStr}-${sequenceStr}`
 }
 
 /**
@@ -36,60 +47,121 @@ export function getShortOrderNumber(fullOrderNumber: string): string {
 
 /**
  * Get the next sequence number from Google Sheets
- * Uses a dedicated sheet to track the global sequence
+ * Uses append operation with row count for atomic-like behavior
+ * Each environment (PROD/PREVIEW/LOCAL) has its own sequence
  */
-async function getNextSequenceNumber(): Promise<number> {
+async function getNextSequenceNumber(environment: string): Promise<number> {
   try {
+    console.log(`[OrderNumber] Generating sequence for environment: ${environment}`)
+    
+    // For local development, use timestamp-based sequences to avoid conflicts
+    if (environment === 'LOCAL') {
+      const localSequence = Date.now() % 1000000
+      console.log(`[OrderNumber] LOCAL environment, using timestamp: ${localSequence}`)
+      return localSequence
+    }
+    
     const sheets = await getSheetsClient()
     const configSheetId = getSheetId('config')
+    const sheetName = 'OrderSequence'
+    const timestamp = new Date().toISOString()
     
-    // Try to read the current sequence from the OrderSequence sheet
-    let currentSequence = 0
-    let sheetExists = false
+    console.log(`[OrderNumber] Using sheet: ${configSheetId}`)
     
+    // First, ensure the sheet exists and has headers
+    try {
+      await sheets.spreadsheets.values.get({
+        spreadsheetId: configSheetId,
+        range: `${sheetName}!A1:C1`,
+      })
+    } catch (error: any) {
+      console.log('[OrderNumber] OrderSequence sheet not found, creating...')
+      
+      // Create the sheet with headers
+      try {
+        await sheets.spreadsheets.batchUpdate({
+          spreadsheetId: configSheetId,
+          requestBody: {
+            requests: [{
+              addSheet: {
+                properties: {
+                  title: sheetName
+                }
+              }
+            }]
+          }
+        })
+        
+        // Add headers
+        await sheets.spreadsheets.values.update({
+          spreadsheetId: configSheetId,
+          range: `${sheetName}!A1:C1`,
+          valueInputOption: 'RAW',
+          requestBody: {
+            values: [['Timestamp', 'Environment', 'Sequence']]
+          }
+        })
+        
+        console.log('[OrderNumber] ✓ OrderSequence sheet created')
+      } catch (createError) {
+        console.error('[OrderNumber] Failed to create sheet:', createError)
+        throw createError
+      }
+    }
+    
+    // Get all existing rows for this environment to calculate next sequence
+    let existingRows = 0
     try {
       const response = await sheets.spreadsheets.values.get({
         spreadsheetId: configSheetId,
-        range: 'OrderSequence!A2',
+        range: `${sheetName}!A2:C`,
       })
       
-      const value = response.data.values?.[0]?.[0]
-      if (value) {
-        currentSequence = parseInt(value, 10) || 0
-      }
-      sheetExists = true
-    } catch (error: any) {
-      // Sheet doesn't exist yet
-      console.log('OrderSequence sheet not found, will use fallback')
+      // Count rows that match this environment
+      const rows = response.data.values || []
+      existingRows = rows.filter(row => row[1] === environment).length
+      
+      console.log(`[OrderNumber] Found ${existingRows} existing ${environment} orders`)
+    } catch (error) {
+      console.log('[OrderNumber] No existing rows found')
     }
     
-    // Increment sequence
-    const nextSequence = currentSequence + 1
+    // Next sequence is count + 1
+    const nextSequence = existingRows + 1
     
-    // Only try to write if sheet exists
-    if (sheetExists) {
-      try {
-        await sheets.spreadsheets.values.update({
-          spreadsheetId: configSheetId,
-          range: 'OrderSequence!A1:A2',
-          valueInputOption: 'RAW',
-          requestBody: {
-            values: [
-              ['Current Sequence'],
-              [nextSequence]
-            ],
-          },
-        })
-      } catch (updateError) {
-        console.log('Could not update OrderSequence, continuing with generated number')
-      }
+    console.log(`[OrderNumber] Next sequence: ${nextSequence}`)
+    
+    // Append a new row to record this sequence
+    // This provides an audit trail and helps prevent duplicates
+    try {
+      await sheets.spreadsheets.values.append({
+        spreadsheetId: configSheetId,
+        range: `${sheetName}!A2:C2`,
+        valueInputOption: 'RAW',
+        requestBody: {
+          values: [[timestamp, environment, nextSequence]]
+        }
+      })
+      
+      console.log(`[OrderNumber] ✓ Sequence ${nextSequence} recorded`)
+    } catch (appendError) {
+      console.warn('[OrderNumber] Failed to record sequence (continuing anyway):', appendError)
+      // Continue anyway - the sequence was calculated and will be used
     }
     
     return nextSequence
+    
   } catch (error) {
-    console.error('Error generating sequence number:', error)
+    console.error('[OrderNumber] ❌ Error generating sequence number:', error)
+    console.error('[OrderNumber] Error details:', {
+      message: error instanceof Error ? error.message : String(error),
+      type: error instanceof Error ? error.constructor.name : typeof error
+    })
+    
     // Fallback to timestamp-based sequence if Google Sheets fails
-    return Date.now() % 1000000
+    const fallbackSequence = Date.now() % 1000000
+    console.log(`[OrderNumber] Using fallback sequence: ${fallbackSequence}`)
+    return fallbackSequence
   }
 }
 
