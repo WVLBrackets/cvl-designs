@@ -65,10 +65,24 @@ export function getSheetId(sheetType: 'config' | 'products' | 'orders'): string 
       return productsId
       
     case 'orders':
-      const ordersId = env === 'production' 
-        ? process.env.GOOGLE_SHEET_ORDERS_PROD_ID
-        : process.env.GOOGLE_SHEET_ORDERS_DEV_ID
-      if (!ordersId) throw new Error(`Orders sheet ID not configured for ${env}`)
+      // Determine which orders sheet to use based on Vercel environment
+      const vercelEnv = process.env.VERCEL_ENV
+      let ordersId: string | undefined
+      
+      if (vercelEnv === 'production') {
+        // Production deployment (main branch)
+        ordersId = process.env.GOOGLE_SHEET_ORDERS_PROD_ID
+      } else if (vercelEnv === 'preview') {
+        // Preview deployment (staging branch and other preview deployments)
+        ordersId = process.env.GOOGLE_SHEET_ORDERS_PREVIEW_ID
+      } else {
+        // Development (local dev server and other environments)
+        ordersId = process.env.GOOGLE_SHEET_ORDERS_DEV_ID
+      }
+      
+      if (!ordersId) {
+        throw new Error(`Orders sheet ID not configured for environment: ${vercelEnv || 'local'}`)
+      }
       return ordersId
       
     default:

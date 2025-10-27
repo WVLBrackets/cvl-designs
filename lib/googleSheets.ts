@@ -392,6 +392,7 @@ export async function submitOrder(order: Order): Promise<{ success: boolean; err
   try {
     console.log('[submitOrder] Starting order submission...')
     console.log('[submitOrder] Order environment:', order.environment)
+    console.log('[submitOrder] VERCEL_ENV:', process.env.VERCEL_ENV || 'not set (local)')
     console.log('[submitOrder] Order items count:', order.items.length)
     
     const sheets = await getSheetsClient()
@@ -399,6 +400,7 @@ export async function submitOrder(order: Order): Promise<{ success: boolean; err
     
     const spreadsheetId = getSheetId('orders')
     console.log('[submitOrder] Target spreadsheet ID:', spreadsheetId)
+    console.log('[submitOrder] Sheet mapping: production→PROD, preview→PREVIEW, other→DEV')
     
     // Prepare rows for each item (repeat rows for quantities > 1)
     console.log('[submitOrder] Preparing order rows...')
