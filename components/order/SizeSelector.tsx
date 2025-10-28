@@ -89,11 +89,12 @@ export default function SizeSelector({
           <div className="p-4 border-b flex items-center justify-between">
             <h3 className="text-xl font-bold text-gray-900">Sizing Chart</h3>
             <div className="flex items-center gap-4">
+              {/* Desktop only: Open in New Tab link */}
               <a
                 href={`/images/product/Sizing/${product.sizingChart}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-blue-600 hover:text-blue-700 text-sm font-medium underline"
+                className="hidden sm:inline text-blue-600 hover:text-blue-700 text-sm font-medium underline"
               >
                 Open in New Tab
               </a>

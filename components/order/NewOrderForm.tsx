@@ -650,28 +650,26 @@ export default function NewOrderForm({
         >
           <div className="flex items-start justify-between gap-2">
             <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2">
-                <h2 className="text-2xl font-bold text-gray-900">{currentItem.product ? (productDetailTitle || 'Configure Item') : (productTitle || 'Configure Item')}</h2>
-                {/* Mobile: Small button next to title */}
-                {currentItem.product && (
-                  <button
-                    onClick={() => setCurrentItem({
-                      product: null,
-                      size: '',
-                      selectedDesignOptions: [],
-                      selectedCustomizationOptions: [],
-                      customizationData: [],
-                    })}
-                    className="sm:hidden flex-shrink-0 px-2 py-1 text-xs bg-gray-100 text-gray-700 hover:bg-gray-200 rounded border border-gray-300"
-                  >
-                    ← Back
-                  </button>
-                )}
-              </div>
+              <h2 className="text-2xl font-bold text-gray-900">{currentItem.product ? (productDetailTitle || 'Configure Item') : (productTitle || 'Configure Item')}</h2>
               <p className="text-gray-600 mt-1">
                 {currentItem.product ? (productDetailInstruction || '') : (productInstruction || 'Select a product to continue')}
               </p>
             </div>
+            {/* Mobile: Small button in right corner */}
+            {currentItem.product && (
+              <button
+                onClick={() => setCurrentItem({
+                  product: null,
+                  size: '',
+                  selectedDesignOptions: [],
+                  selectedCustomizationOptions: [],
+                  customizationData: [],
+                })}
+                className="sm:hidden flex-shrink-0 px-2 py-1 text-xs bg-gray-100 text-gray-700 hover:bg-gray-200 rounded border border-gray-300"
+              >
+                ← Back
+              </button>
+            )}
             {/* Desktop: Original underline link */}
             {currentItem.product && (
               <button
