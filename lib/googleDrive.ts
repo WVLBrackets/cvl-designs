@@ -84,7 +84,11 @@ async function getOrCreateRootFolder(drive: any): Promise<string> {
     })
 
     if (response.data.files && response.data.files.length > 0) {
-      INVOICES_FOLDER_ID = response.data.files[0].id
+      const folderId = response.data.files[0].id
+      if (!folderId) {
+        throw new Error('Found folder but no ID returned')
+      }
+      INVOICES_FOLDER_ID = folderId
       console.log(`[GoogleDrive] ✓ Found existing root folder: ${INVOICES_FOLDER_ID}`)
       return INVOICES_FOLDER_ID
     }
@@ -101,7 +105,11 @@ async function getOrCreateRootFolder(drive: any): Promise<string> {
       fields: 'id',
     })
 
-    INVOICES_FOLDER_ID = folder.data.id
+    const folderId = folder.data.id
+    if (!folderId) {
+      throw new Error('Created folder but no ID returned')
+    }
+    INVOICES_FOLDER_ID = folderId
     console.log(`[GoogleDrive] ✓ Created root folder: ${INVOICES_FOLDER_ID}`)
 
     // Share with admin users
@@ -157,8 +165,12 @@ async function getOrCreateEnvironmentFolder(
       fields: 'id',
     })
 
-    console.log(`[GoogleDrive] ✓ Created ${folderName} folder: ${folder.data.id}`)
-    return folder.data.id
+    const folderId = folder.data.id
+    if (!folderId) {
+      throw new Error(`Created ${folderName} folder but no ID returned`)
+    }
+    console.log(`[GoogleDrive] ✓ Created ${folderName} folder: ${folderId}`)
+    return folderId
   } catch (error) {
     console.error(`[GoogleDrive] Error getting/creating ${folderName} folder:`, error)
     throw error
