@@ -122,6 +122,9 @@ export default async function Home({
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
           {/* Mobile Layout: Stacked and Centered */}
           <div className="sm:hidden flex flex-col items-center gap-3 text-center">
+            {/* Row 1: Header Title at top */}
+            {headerTitle ? (<h1 className="text-xl font-bold text-gray-900">{headerTitle}</h1>) : null}
+            
             {/* Logos Row */}
             <div className="flex items-center justify-center gap-4">
               <div className="relative flex-shrink-0" style={{ width: '60px', height: '60px' }}>
@@ -144,26 +147,17 @@ export default async function Home({
               )}
             </div>
             
-            {/* Text Content */}
+            {/* Text Content Below Logos */}
             <div>
-              {/* Row 1: Header Title */}
-              {headerTitle ? (<h1 className="text-xl font-bold text-gray-900">{headerTitle}</h1>) : null}
-              
-              {/* Row 2: Header Subtitle - hidden on very small screens */}
-              {headerSubtitle ? (<p className="text-sm text-gray-600 hidden min-[400px]:block">{headerSubtitle}</p>) : null}
-              
-              {/* Row 3: Line break */}
-              {(storeDisplayName || headerStoreSubtitle) && <div className="mt-1"></div>}
-              
-              {/* Row 4: Store Display Name + "Store" */}
+              {/* Store Display Name + "Store" */}
               {storeDisplayName ? (
                 <h2 className="font-bold text-gray-900 text-lg">
                   {storeDisplayName} Store
                 </h2>
               ) : null}
               
-              {/* Row 5: Header Store Subtitle - hidden on very small screens */}
-              {headerStoreSubtitle ? (<p className="text-sm text-gray-600 italic hidden min-[400px]:block">{headerStoreSubtitle}</p>) : null}
+              {/* Header Store Subtitle - always visible on mobile */}
+              {headerStoreSubtitle ? (<p className="text-sm text-gray-600 italic">{headerStoreSubtitle}</p>) : null}
             </div>
             
             {/* Dev Badge */}
