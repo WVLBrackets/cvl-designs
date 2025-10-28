@@ -125,29 +125,19 @@ export default async function Home({
             {/* Row 1: Header Title at top */}
             {headerTitle ? (<h1 className="text-xl font-bold text-gray-900">{headerTitle}</h1>) : null}
             
-            {/* Logos Row */}
-            <div className="flex items-center justify-center gap-4">
-              <div className="relative flex-shrink-0" style={{ width: '60px', height: '60px' }}>
+            {/* Store Logo - Larger and Centered */}
+            {storeLogoSrc && (
+              <div className="relative flex-shrink-0" style={{ width: '80px', height: '80px' }}>
                 <Image
-                  src={headerLogoSrc}
-                  alt={`${businessName} Logo`}
+                  src={storeLogoSrc}
+                  alt="Store Logo"
                   fill
                   className="object-contain"
                 />
               </div>
-              {storeLogoSrc && (
-                <div className="relative flex-shrink-0" style={{ width: '60px', height: '60px' }}>
-                  <Image
-                    src={storeLogoSrc}
-                    alt="Store Logo"
-                    fill
-                    className="object-contain"
-                  />
-                </div>
-              )}
-            </div>
+            )}
             
-            {/* Text Content Below Logos */}
+            {/* Text Content Below Logo */}
             <div>
               {/* Store Display Name + "Store" */}
               {storeDisplayName ? (
@@ -268,7 +258,50 @@ export default async function Home({
       {/* Footer */}
       <footer className="bg-white border-t mt-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="flex justify-between items-center">
+          {/* Mobile Footer: Stacked and Centered */}
+          <div className="sm:hidden flex flex-col items-center gap-4 text-center">
+            {/* CVL Designs Logo */}
+            <div className="relative flex-shrink-0" style={{ width: '60px', height: '60px' }}>
+              <Image
+                src={headerLogoSrc}
+                alt={`${businessName} Logo`}
+                fill
+                className="object-contain"
+              />
+            </div>
+            
+            {/* Footer Text - Shrunk to fit on one line */}
+            <p className="text-gray-500 text-xs leading-tight">
+              {config.Footer || `© ${new Date().getFullYear()} ${businessName}. All rights reserved.`}
+            </p>
+            
+            {/* Contact Us Link */}
+            {contactMeEmail && (
+              <a
+                href={`mailto:${contactMeEmail}`}
+                className="flex items-center gap-2 text-sm text-blue-600 hover:text-blue-800 transition-colors"
+              >
+                <svg
+                  className="w-5 h-5"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
+                  />
+                </svg>
+                Contact Us
+              </a>
+            )}
+          </div>
+          
+          {/* Desktop Footer: Original Horizontal Layout */}
+          <div className="hidden sm:flex justify-between items-center">
             <p className="text-gray-500 text-sm">
               {config.Footer || `© ${new Date().getFullYear()} ${businessName}. All rights reserved.`}
             </p>
