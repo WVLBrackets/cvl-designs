@@ -120,7 +120,62 @@ export default async function Home({
       {/* Header */}
       <header className="bg-white shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
-          <div className="flex items-center justify-between gap-4">
+          {/* Mobile Layout: Stacked and Centered */}
+          <div className="sm:hidden flex flex-col items-center gap-3 text-center">
+            {/* Logos Row */}
+            <div className="flex items-center justify-center gap-4">
+              <div className="relative flex-shrink-0" style={{ width: '60px', height: '60px' }}>
+                <Image
+                  src={headerLogoSrc}
+                  alt={`${businessName} Logo`}
+                  fill
+                  className="object-contain"
+                />
+              </div>
+              {storeLogoSrc && (
+                <div className="relative flex-shrink-0" style={{ width: '60px', height: '60px' }}>
+                  <Image
+                    src={storeLogoSrc}
+                    alt="Store Logo"
+                    fill
+                    className="object-contain"
+                  />
+                </div>
+              )}
+            </div>
+            
+            {/* Text Content */}
+            <div>
+              {/* Row 1: Header Title */}
+              {headerTitle ? (<h1 className="text-xl font-bold text-gray-900">{headerTitle}</h1>) : null}
+              
+              {/* Row 2: Header Subtitle - hidden on very small screens */}
+              {headerSubtitle ? (<p className="text-sm text-gray-600 hidden min-[400px]:block">{headerSubtitle}</p>) : null}
+              
+              {/* Row 3: Line break */}
+              {(storeDisplayName || headerStoreSubtitle) && <div className="mt-1"></div>}
+              
+              {/* Row 4: Store Display Name + "Store" */}
+              {storeDisplayName ? (
+                <h2 className="font-bold text-gray-900 text-lg">
+                  {storeDisplayName} Store
+                </h2>
+              ) : null}
+              
+              {/* Row 5: Header Store Subtitle - hidden on very small screens */}
+              {headerStoreSubtitle ? (<p className="text-sm text-gray-600 italic hidden min-[400px]:block">{headerStoreSubtitle}</p>) : null}
+            </div>
+            
+            {/* Dev Badge */}
+            {environment === 'development' && (
+              <span className="bg-yellow-100 text-yellow-800 text-xs font-medium px-2 py-1 rounded">
+                Dev Mode
+              </span>
+            )}
+          </div>
+          
+          {/* Desktop Layout: Original Horizontal */}
+          <div className="hidden sm:flex items-center justify-between gap-4">
             {/* Left: CVLD Logo */}
             <div className="flex items-center gap-4">
               <div className="relative flex-shrink-0" style={{ width: `${logoSizePx}px`, height: `${logoSizePx}px` }}>
