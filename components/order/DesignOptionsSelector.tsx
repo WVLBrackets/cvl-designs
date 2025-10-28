@@ -71,37 +71,39 @@ export default function DesignOptionsSelector({
             <button
               key={option.number}
               onClick={() => onToggle(option.number)}
-              className={`p-4 border-2 rounded-lg transition-all ${
+              className={`p-4 sm:p-4 p-3 border-2 rounded-lg transition-all ${
                 isSelected
                   ? 'border-primary-600 bg-primary-50'
                   : 'border-gray-200 hover:border-primary-300 bg-white'
               }`}
             >
-              {/* Mobile: Stacked layout */}
-              <div className="sm:hidden flex flex-col items-center text-center gap-3">
-                {option.image && (
-                  <ProductImage
-                    src={option.image}
-                    alt={option.title}
-                    type="design"
-                    width={100}
-                    height={100}
-                    className="flex-shrink-0"
-                  />
-                )}
-                <div className="w-full">
-                  <p className="font-medium text-gray-900">{option.title}</p>
-                  <p className="text-sm text-primary-600 font-semibold mt-1">
-                    {option.price > 0 ? `+$${option.price}` : noCostLabel}
-                  </p>
-                </div>
-                {isSelected && (
-                  <div className="w-6 h-6 bg-primary-600 rounded-full flex items-center justify-center">
-                    <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                    </svg>
+              {/* Mobile: Large image with price on right, title below */}
+              <div className="sm:hidden">
+                <div className="flex items-start gap-2 mb-2">
+                  {option.image && (
+                    <ProductImage
+                      src={option.image}
+                      alt={option.title}
+                      type="design"
+                      width={140}
+                      height={140}
+                      className="flex-shrink-0"
+                    />
+                  )}
+                  <div className="flex flex-col items-end justify-between h-[140px] py-1">
+                    <p className="text-sm text-primary-600 font-semibold text-right">
+                      {option.price > 0 ? `+$${option.price}` : noCostLabel}
+                    </p>
+                    {isSelected && (
+                      <div className="w-6 h-6 bg-primary-600 rounded-full flex items-center justify-center">
+                        <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                        </svg>
+                      </div>
+                    )}
                   </div>
-                )}
+                </div>
+                <p className="font-medium text-gray-900 text-sm">{option.title}</p>
               </div>
               
               {/* Desktop: Original horizontal layout */}
