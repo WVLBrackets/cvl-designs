@@ -400,7 +400,7 @@ async function generateProfessionalTemplateBuffer(data: InvoiceData): Promise<Bu
       // Get page range
       const range = doc.bufferedPageRange()
       
-      for (let i = 0; i < range.count; i++) {
+      for (let i = range.start; i < range.start + range.count; i++) {
         doc.switchToPage(i)
         
         // Save the current state
