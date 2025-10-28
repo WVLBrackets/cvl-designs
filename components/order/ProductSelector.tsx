@@ -38,7 +38,26 @@ export default function ProductSelector({
       <div className="space-y-4 -mt-2">
         <div className="grid gap-3">
           <div className="p-4 border-2 rounded-lg bg-white">
-            <div className="flex items-center gap-3">
+            {/* Mobile: Stacked layout with larger centered image (non-zoomable) */}
+            <div className="sm:hidden flex flex-col items-center gap-3 text-center">
+              <ProductImage
+                src={product.image}
+                alt={product.name}
+                type="item"
+                width={180}
+                height={180}
+                className="flex-shrink-0"
+              />
+              <div className="w-full">
+                <p className="font-medium text-gray-900 text-lg">{displayPrice}</p>
+                {product.status === 'PREVIEW' && (
+                  <span className="inline-block mt-1 bg-yellow-100 text-yellow-800 text-xs px-2 py-0.5 rounded">Preview</span>
+                )}
+              </div>
+            </div>
+            
+            {/* Desktop: Original horizontal layout with zoom */}
+            <div className="hidden sm:flex items-center gap-3">
               <ProductImageWithZoom
                 src={product.image}
                 alt={product.name}
