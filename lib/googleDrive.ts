@@ -89,8 +89,8 @@ async function getOrCreateRootFolder(drive: any): Promise<string> {
         throw new Error('Found folder but no ID returned')
       }
       INVOICES_FOLDER_ID = folderId
-      console.log(`[GoogleDrive] ✓ Found existing root folder: ${INVOICES_FOLDER_ID}`)
-      return INVOICES_FOLDER_ID
+      console.log(`[GoogleDrive] ✓ Found existing root folder: ${folderId}`)
+      return folderId
     }
 
     // Create root folder if it doesn't exist
@@ -110,12 +110,12 @@ async function getOrCreateRootFolder(drive: any): Promise<string> {
       throw new Error('Created folder but no ID returned')
     }
     INVOICES_FOLDER_ID = folderId
-    console.log(`[GoogleDrive] ✓ Created root folder: ${INVOICES_FOLDER_ID}`)
+    console.log(`[GoogleDrive] ✓ Created root folder: ${folderId}`)
 
     // Share with admin users
-    await shareFolder(drive, INVOICES_FOLDER_ID)
+    await shareFolder(drive, folderId)
 
-    return INVOICES_FOLDER_ID
+    return folderId
   } catch (error) {
     console.error(`[GoogleDrive] Error getting/creating root folder:`, error)
     throw error
