@@ -212,6 +212,9 @@ export function generateCustomerEmail(data: CustomerEmailData): string {
                       Please send payment of $${data.total.toFixed(2)} using one of the following methods:
                     </p>
                     ${paymentMethodsHtml.join('')}
+                    <div style="text-align: center; margin-top: 20px;">
+                      <img src="https://cvl-designs.vercel.app/images/brand/Payment%20Options.jpg" alt="Payment Options" style="max-width: 100%; height: auto; border-radius: 4px;" />
+                    </div>
                   </div>
                   <p style="margin: 15px 0 0 0; font-size: 14px; color: #6b7280; line-height: 1.6;">
                     Your invoice is attached to this email for your records. Please reference order #${data.shortOrderNumber} when making payment.
