@@ -63,7 +63,6 @@ export default function PaymentOptions({
               sizes="160px"
             />
           </div>
-          <h3 className="font-bold text-lg text-gray-900 mb-2">Venmo</h3>
           <p className="text-sm text-gray-600 whitespace-pre-line">{venmoMessage}</p>
         </div>
         
@@ -78,7 +77,6 @@ export default function PaymentOptions({
               sizes="160px"
             />
           </div>
-          <h3 className="font-bold text-lg text-gray-900 mb-2">Zelle</h3>
           <p className="text-sm text-gray-600 whitespace-pre-line">{zelleMessage}</p>
         </div>
         
@@ -93,7 +91,6 @@ export default function PaymentOptions({
               sizes="160px"
             />
           </div>
-          <h3 className="font-bold text-lg text-gray-900 mb-2">Cash App</h3>
           <p className="text-sm text-gray-600 whitespace-pre-line">{cashAppMessage}</p>
         </div>
       </div>
