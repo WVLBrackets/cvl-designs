@@ -77,8 +77,87 @@ export default function OrderSummary({
           
           return (
         <div key={index} className="border rounded-lg p-3">
-          {/* Collapsed View - One Line */}
-          <div className="flex items-start gap-2">
+          {/* Mobile: Multi-row layout */}
+          <div className="sm:hidden space-y-2">
+            {/* Row 1: Product Name and Size */}
+            <div className="font-semibold text-gray-900">
+              {item.productName} <span className="text-sm text-gray-600">({item.size})</span>
+            </div>
+            
+            {/* Row 2: Quantity Controls and Price */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1 bg-gray-100 rounded px-2 py-1">
+                <button
+                  onClick={() => onUpdateQuantity(index, item.quantity - 1)}
+                  disabled={item.quantity <= 1}
+                  className="w-7 h-7 flex items-center justify-center text-gray-700 hover:bg-gray-200 rounded disabled:opacity-30 disabled:cursor-not-allowed font-bold text-lg"
+                  aria-label="Decrease quantity"
+                >
+                  −
+                </button>
+                <span className="w-10 text-center font-medium text-gray-900">{item.quantity}</span>
+                <button
+                  onClick={() => onUpdateQuantity(index, item.quantity + 1)}
+                  className="w-7 h-7 flex items-center justify-center text-gray-700 hover:bg-gray-200 rounded font-bold text-lg"
+                  aria-label="Increase quantity"
+                >
+                  +
+                </button>
+              </div>
+              <div className="font-bold text-gray-900 text-lg">
+                ${itemTotal.toFixed(2)}
+              </div>
+            </div>
+            
+            {/* Row 3: Details Button and Action Buttons */}
+            <div className="flex items-center justify-between pt-1 border-t">
+              <button
+                onClick={() => toggleExpand(index)}
+                className="flex items-center gap-1 text-sm text-gray-600 hover:text-gray-900"
+              >
+                <span className="w-5 h-5 flex items-center justify-center rounded border border-gray-400 font-bold text-xs">
+                  {isExpanded ? '−' : '+'}
+                </span>
+                <span>Details</span>
+              </button>
+              
+              <div className="flex gap-2">
+                <button
+                  onClick={() => onCopyItem(index)}
+                  className="w-8 h-8 bg-green-100 hover:bg-green-200 text-green-700 rounded flex items-center justify-center"
+                  title="Copy"
+                  aria-label="Copy item"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                  </svg>
+                </button>
+                <button
+                  onClick={() => onEditItem(index)}
+                  className="w-8 h-8 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded flex items-center justify-center"
+                  title="Edit"
+                  aria-label="Edit item"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                  </svg>
+                </button>
+                <button
+                  onClick={() => handleRemoveClick(index)}
+                  className="w-8 h-8 bg-red-100 hover:bg-red-200 text-red-700 rounded flex items-center justify-center"
+                  title="Remove"
+                  aria-label="Remove item"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+          </div>
+          
+          {/* Desktop: Original one-line layout */}
+          <div className="hidden sm:flex items-start gap-2">
             {/* Expand/Collapse Button with Label */}
             <div className="flex flex-col items-center gap-0.5 flex-shrink-0">
               <button
