@@ -84,7 +84,7 @@ export default function OrderSummary({
               {item.productName} <span className="text-sm text-gray-600">({item.size})</span>
             </div>
             
-            {/* Row 2: Quantity Controls and Price */}
+            {/* Row 2: Quantity Controls and Action Buttons */}
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-1 bg-gray-100 rounded px-2 py-1">
                 <button
@@ -104,22 +104,6 @@ export default function OrderSummary({
                   +
                 </button>
               </div>
-              <div className="font-bold text-gray-900 text-lg">
-                ${itemTotal.toFixed(2)}
-              </div>
-            </div>
-            
-            {/* Row 3: Details Button and Action Buttons */}
-            <div className="flex items-center justify-between pt-1 border-t">
-              <button
-                onClick={() => toggleExpand(index)}
-                className="flex items-center gap-1 text-sm text-gray-600 hover:text-gray-900"
-              >
-                <span className="w-5 h-5 flex items-center justify-center rounded border border-gray-400 font-bold text-xs">
-                  {isExpanded ? '−' : '+'}
-                </span>
-                <span>Details</span>
-              </button>
               
               <div className="flex gap-2">
                 <button
@@ -153,6 +137,25 @@ export default function OrderSummary({
                   </svg>
                 </button>
               </div>
+            </div>
+            
+            {/* Row 3: Details Button and Price (price hidden when expanded) */}
+            <div className="flex items-center justify-between pt-1 border-t">
+              <button
+                onClick={() => toggleExpand(index)}
+                className="flex items-center gap-1 text-sm text-gray-600 hover:text-gray-900"
+              >
+                <span className="w-5 h-5 flex items-center justify-center rounded border border-gray-400 font-bold text-xs">
+                  {isExpanded ? '−' : '+'}
+                </span>
+                <span>Details</span>
+              </button>
+              
+              {!isExpanded && (
+                <div className="font-bold text-gray-900 text-lg">
+                  ${itemTotal.toFixed(2)}
+                </div>
+              )}
             </div>
           </div>
           
