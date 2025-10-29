@@ -57,7 +57,27 @@ export default async function HomePage({
       {/* Header */}
       <header className="bg-white shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+          {/* Mobile Layout: Stacked and Centered (matches storefront) */}
+          <div className="sm:hidden flex flex-col items-center gap-3 text-center">
+            {/* Row 1: Header Title at top */}
+            {headerTitle ? (<h1 className="text-xl font-bold text-gray-900">{headerTitle}</h1>) : null}
+            
+            {/* Row 2: Header Logo - Same size as store logos (80px) */}
+            <div className="relative flex-shrink-0" style={{ width: '80px', height: '80px' }}>
+              <Image
+                src={headerLogoSrc}
+                alt={`${businessName} Logo`}
+                fill
+                className="object-contain"
+              />
+            </div>
+            
+            {/* Row 3: Header Subtitle in italics */}
+            {headerSubtitle ? (<p className="text-sm text-gray-600 italic">{headerSubtitle}</p>) : null}
+          </div>
+
+          {/* Desktop Layout: Horizontal (unchanged) */}
+          <div className="hidden sm:flex flex-row items-center justify-center gap-4">
             <div className="flex items-center gap-4">
               <div className="relative flex-shrink-0" style={{ width: `${logoSizePx}px`, height: `${logoSizePx}px` }}>
                 <Image
