@@ -105,133 +105,133 @@ export default function CustomizationOptionsSelector({
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
         {productOptions.map(option => {
           const isSelected = selectedOptions.includes(option.number)
-          const data = customizationData.find(d => d.optionNumber === option.number)
-          const requiresInput = option.requiresInput && option.requiresInput !== 'none'
           
           return (
-            <div
+            <button
               key={option.number}
-              className={`${requiresInput && isSelected ? 'col-span-2 sm:col-span-4' : ''}`}
+              onClick={() => onToggle(option.number)}
+              className={`p-1 border-2 rounded-lg transition-all flex flex-col relative ${
+                isSelected
+                  ? 'border-primary-600 bg-primary-50'
+                  : 'border-gray-200 hover:border-primary-300 bg-white'
+              }`}
             >
-              <div
-                className={`p-1 border-2 rounded-lg transition-all flex flex-col ${
-                  isSelected
-                    ? 'border-primary-600 bg-primary-50'
-                    : 'border-gray-200 bg-white'
-                }`}
-              >
-                <button
-                  onClick={() => onToggle(option.number)}
-                  className="w-full relative flex flex-col flex-1"
-                >
-                  {/* Mobile: Square cards with fixed aspect ratio */}
-                  <div className="sm:hidden flex flex-col">
-                    {option.image && (
-                      <div className="w-full aspect-square flex items-center justify-center p-2">
-                        <ProductImage
-                          src={option.image}
-                          alt={option.title}
-                          type="customization"
-                          width={180}
-                          height={180}
-                          className="max-w-full max-h-full object-contain"
-                        />
-                      </div>
-                    )}
-                    <div className="h-10 flex items-center justify-center px-1">
-                      <p className="font-medium text-gray-900 text-xs line-clamp-2 text-center">
-                        {option.title}{option.price > 0 ? ` ($${option.price})` : ''}
-                      </p>
-                    </div>
-                    {isSelected && (
-                      <div className="absolute top-1 right-1 w-5 h-5 bg-primary-600 rounded-full flex items-center justify-center">
-                        <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
-                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                        </svg>
-                      </div>
-                    )}
+              {/* Mobile: Square cards with fixed aspect ratio */}
+              <div className="sm:hidden flex flex-col">
+                {option.image && (
+                  <div className="w-full aspect-square flex items-center justify-center p-2">
+                    <ProductImage
+                      src={option.image}
+                      alt={option.title}
+                      type="customization"
+                      width={180}
+                      height={180}
+                      className="max-w-full max-h-full object-contain"
+                    />
                   </div>
-
-                  {/* Desktop: Reduced image size (85% of previous), 2x zoom */}
-                  <div className="hidden sm:flex flex-col flex-1">
-                    {option.image && (
-                      <div className="w-full flex-1 flex items-center justify-center p-3">
-                        <div className="w-[85%] h-[85%] flex items-center justify-center">
-                          <ProductImageWithZoom
-                            src={option.image}
-                            alt={option.title}
-                            type="customization"
-                            width={212}
-                            height={212}
-                            zoomScale={2}
-                            className="max-w-full max-h-full object-contain"
-                          />
-                        </div>
-                      </div>
-                    )}
-                    <p className="font-medium text-gray-900 text-xs px-1 py-1 line-clamp-2 text-center">
-                      {option.title}{option.price > 0 ? ` ($${option.price})` : ''}
-                    </p>
-                    {isSelected && (
-                      <div className="absolute top-1 right-1 w-5 h-5 bg-primary-600 rounded-full flex items-center justify-center">
-                        <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
-                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                        </svg>
-                      </div>
-                    )}
-                  </div>
-                </button>
-                
-                {/* Show input fields if selected and requires input */}
-                {isSelected && requiresInput && (
-                  <div className="mt-3 pt-3 border-t border-gray-200 space-y-2">
-                    {(option.requiresInput === 'name' || option.requiresInput === 'both') && (
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Player Name *
-                        </label>
-                        <input
-                          type="text"
-                          value={data?.customName || ''}
-                          onChange={(e) => onDataChange(option.number, 'customName', e.target.value)}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                          placeholder="Enter player name"
-                          onClick={(e) => e.stopPropagation()}
-                        />
-                      </div>
-                    )}
-                    
-                    {(option.requiresInput === 'number' || option.requiresInput === 'both') && (
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Player Number *
-                        </label>
-                        <input
-                          type="tel"
-                          inputMode="numeric"
-                          pattern="[0-9]*"
-                          value={data?.customNumber || ''}
-                          onChange={(e) => onDataChange(option.number, 'customNumber', e.target.value)}
-                          className={`w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-primary-500 ${
-                            data?.customNumber && !isValidNumber(data.customNumber)
-                              ? 'border-red-500 bg-red-50'
-                              : 'border-gray-300'
-                          }`}
-                          placeholder="Enter player number"
-                          onClick={(e) => e.stopPropagation()}
-                        />
-                        {data?.customNumber && !isValidNumber(data.customNumber) && (
-                          <p className="text-red-600 text-xs mt-1">Please enter a valid number</p>
-                        )}
-                      </div>
-                    )}
+                )}
+                <div className="h-10 flex items-center justify-center px-1">
+                  <p className="font-medium text-gray-900 text-xs line-clamp-2 text-center">
+                    {option.title}{option.price > 0 ? ` ($${option.price})` : ''}
+                  </p>
+                </div>
+                {isSelected && (
+                  <div className="absolute top-1 right-1 w-5 h-5 bg-primary-600 rounded-full flex items-center justify-center">
+                    <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                    </svg>
                   </div>
                 )}
               </div>
-            </div>
+
+              {/* Desktop: Reduced image size (85% of previous), 2x zoom */}
+              <div className="hidden sm:flex flex-col flex-1">
+                {option.image && (
+                  <div className="w-full flex-1 flex items-center justify-center p-3">
+                    <div className="w-[85%] h-[85%] flex items-center justify-center">
+                      <ProductImageWithZoom
+                        src={option.image}
+                        alt={option.title}
+                        type="customization"
+                        width={212}
+                        height={212}
+                        zoomScale={2}
+                        className="max-w-full max-h-full object-contain"
+                      />
+                    </div>
+                  </div>
+                )}
+                <p className="font-medium text-gray-900 text-xs px-1 py-1 line-clamp-2 text-center">
+                  {option.title}{option.price > 0 ? ` ($${option.price})` : ''}
+                </p>
+                {isSelected && (
+                  <div className="absolute top-1 right-1 w-5 h-5 bg-primary-600 rounded-full flex items-center justify-center">
+                    <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                    </svg>
+                  </div>
+                )}
+              </div>
+            </button>
           )
         })}
       </div>
+      
+      {/* Show input fields below grid for selected options that require input */}
+      {selectedOptions.map(optNum => {
+        const option = productOptions.find(o => o.number === optNum)
+        if (!option) return null
+        
+        const requiresInput = option.requiresInput && option.requiresInput !== 'none'
+        if (!requiresInput) return null
+        
+        const data = customizationData.find(d => d.optionNumber === optNum)
+        
+        return (
+          <div key={optNum} className="mt-4 p-4 border-2 border-primary-600 bg-primary-50 rounded-lg space-y-3">
+            <h4 className="font-semibold text-gray-900">{option.title}</h4>
+            
+            {(option.requiresInput === 'name' || option.requiresInput === 'both') && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Player Name *
+                </label>
+                <input
+                  type="text"
+                  value={data?.customName || ''}
+                  onChange={(e) => onDataChange(option.number, 'customName', e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                  placeholder="Enter player name"
+                />
+              </div>
+            )}
+            
+            {(option.requiresInput === 'number' || option.requiresInput === 'both') && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Player Number *
+                </label>
+                <input
+                  type="tel"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  value={data?.customNumber || ''}
+                  onChange={(e) => onDataChange(option.number, 'customNumber', e.target.value)}
+                  className={`w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-primary-500 ${
+                    data?.customNumber && !isValidNumber(data.customNumber)
+                      ? 'border-red-500 bg-red-50'
+                      : 'border-gray-300'
+                  }`}
+                  placeholder="Enter player number"
+                />
+                {data?.customNumber && !isValidNumber(data.customNumber) && (
+                  <p className="text-red-600 text-xs mt-1">Please enter a valid number</p>
+                )}
+              </div>
+            )}
+          </div>
+        )
+      })}
     </div>
   )
 }
