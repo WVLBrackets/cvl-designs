@@ -64,7 +64,7 @@ export default function DesignOptionsSelector({
         </p>
       </div>
       
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
         {productOptions.map(option => {
           const isSelected = selectedOptions.includes(option.number)
           
@@ -72,32 +72,32 @@ export default function DesignOptionsSelector({
             <button
               key={option.number}
               onClick={() => onToggle(option.number)}
-              className={`p-2 border-2 rounded-lg transition-all relative ${
+              className={`p-1 border-2 rounded-lg transition-all relative flex flex-col ${
                 isSelected
                   ? 'border-primary-600 bg-primary-50'
                   : 'border-gray-200 hover:border-primary-300 bg-white'
               }`}
             >
               {/* Mobile: Square layout without zoom */}
-              <div className="sm:hidden flex flex-col items-center text-center">
+              <div className="sm:hidden flex flex-col flex-1 items-center text-center">
                 {option.image && (
-                  <div className="w-full aspect-square mb-2 flex items-center justify-center">
+                  <div className="w-full aspect-square flex items-center justify-center overflow-hidden">
                     <ProductImage
                       src={option.image}
                       alt={option.title}
                       type="design"
                       width={200}
                       height={200}
-                      className="max-w-full max-h-full object-contain"
+                      className="w-full h-full object-cover"
                     />
                   </div>
                 )}
-                <p className="font-medium text-gray-900 text-sm">
+                <p className="font-medium text-gray-900 text-xs mt-1 px-1 line-clamp-2">
                   {option.title}{option.price > 0 ? ` ($${option.price})` : ''}
                 </p>
                 {isSelected && (
-                  <div className="absolute top-2 right-2 w-6 h-6 bg-primary-600 rounded-full flex items-center justify-center">
-                    <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+                  <div className="absolute top-1 right-1 w-5 h-5 bg-primary-600 rounded-full flex items-center justify-center">
+                    <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
                       <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                     </svg>
                   </div>
@@ -105,25 +105,25 @@ export default function DesignOptionsSelector({
               </div>
 
               {/* Desktop: Square layout with zoom on hover */}
-              <div className="hidden sm:flex flex-col items-center text-center">
+              <div className="hidden sm:flex flex-col flex-1 items-center text-center">
                 {option.image && (
-                  <div className="w-full aspect-square mb-2 flex items-center justify-center">
+                  <div className="w-full aspect-square flex items-center justify-center overflow-hidden">
                     <ProductImageWithZoom
                       src={option.image}
                       alt={option.title}
                       type="design"
                       width={200}
                       height={200}
-                      className="max-w-full max-h-full object-contain"
+                      className="w-full h-full object-cover"
                     />
                   </div>
                 )}
-                <p className="font-medium text-gray-900 text-sm">
+                <p className="font-medium text-gray-900 text-xs mt-1 px-1 line-clamp-2">
                   {option.title}{option.price > 0 ? ` ($${option.price})` : ''}
                 </p>
                 {isSelected && (
-                  <div className="absolute top-2 right-2 w-6 h-6 bg-primary-600 rounded-full flex items-center justify-center">
-                    <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+                  <div className="absolute top-1 right-1 w-5 h-5 bg-primary-600 rounded-full flex items-center justify-center">
+                    <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
                       <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                     </svg>
                   </div>
