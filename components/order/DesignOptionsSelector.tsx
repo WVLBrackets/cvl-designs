@@ -81,13 +81,13 @@ export default function DesignOptionsSelector({
               {/* Mobile: Square layout without zoom */}
               <div className="sm:hidden flex flex-col flex-1">
                 {option.image && (
-                  <div className="w-full flex-1 flex items-center justify-center p-1">
+                  <div className="w-full flex-1 flex items-center justify-center p-2">
                     <ProductImage
                       src={option.image}
                       alt={option.title}
                       type="design"
-                      width={300}
-                      height={300}
+                      width={250}
+                      height={250}
                       className="max-w-full max-h-full object-contain"
                     />
                   </div>
@@ -107,13 +107,13 @@ export default function DesignOptionsSelector({
               {/* Desktop: Square layout with zoom on hover */}
               <div className="hidden sm:flex flex-col flex-1">
                 {option.image && (
-                  <div className="w-full flex-1 flex items-center justify-center p-1">
+                  <div className="w-full flex-1 flex items-center justify-center p-2">
                     <ProductImageWithZoom
                       src={option.image}
                       alt={option.title}
                       type="design"
-                      width={300}
-                      height={300}
+                      width={250}
+                      height={250}
                       className="max-w-full max-h-full object-contain"
                     />
                   </div>
