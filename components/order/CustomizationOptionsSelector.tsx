@@ -110,28 +110,28 @@ export default function CustomizationOptionsSelector({
             <button
               key={option.number}
               onClick={() => onToggle(option.number)}
-              className={`p-1 border-2 rounded-lg transition-all flex flex-col relative ${
+              className={`border-2 rounded-lg transition-all relative ${
                 isSelected
                   ? 'border-primary-600 bg-primary-50'
                   : 'border-gray-200 hover:border-primary-300 bg-white'
-              }`}
+              } sm:p-1 sm:flex sm:flex-col`}
             >
-              {/* Mobile: Square cards with fixed aspect ratio */}
-              <div className="sm:hidden flex flex-col">
+              {/* Mobile: Perfect square cards */}
+              <div className="sm:hidden aspect-square w-full p-1 flex flex-col">
                 {option.image && (
-                  <div className="w-full aspect-square flex items-center justify-center p-2">
+                  <div className="flex-1 flex items-center justify-center">
                     <ProductImage
                       src={option.image}
                       alt={option.title}
                       type="customization"
-                      width={180}
-                      height={180}
+                      width={150}
+                      height={150}
                       className="max-w-full max-h-full object-contain"
                     />
                   </div>
                 )}
-                <div className="h-10 flex items-center justify-center px-1">
-                  <p className="font-medium text-gray-900 text-xs line-clamp-2 text-center">
+                <div className="h-8 flex items-center justify-center px-1 mt-1">
+                  <p className="font-medium text-gray-900 text-xs line-clamp-2 text-center leading-tight">
                     {option.title}{option.price > 0 ? ` ($${option.price})` : ''}
                   </p>
                 </div>
