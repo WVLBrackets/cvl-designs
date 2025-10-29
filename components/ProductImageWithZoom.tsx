@@ -14,6 +14,7 @@ interface ProductImageWithZoomProps {
   width: number
   height: number
   className?: string
+  zoomScale?: number
 }
 
 export default function ProductImageWithZoom({
@@ -23,6 +24,7 @@ export default function ProductImageWithZoom({
   width,
   height,
   className = '',
+  zoomScale = 3,
 }: ProductImageWithZoomProps) {
   const [showZoom, setShowZoom] = useState(false)
   const [zoomPosition, setZoomPosition] = useState({ x: 0, y: 0 })
@@ -99,8 +101,8 @@ export default function ProductImageWithZoom({
               src={src}
               alt={`${alt} (zoomed)`}
               type={type}
-              width={width * 3}
-              height={height * 3}
+              width={width * zoomScale}
+              height={height * zoomScale}
             />
           </div>
         </div>

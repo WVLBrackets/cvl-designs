@@ -78,23 +78,25 @@ export default function DesignOptionsSelector({
                   : 'border-gray-200 hover:border-primary-300 bg-white'
               }`}
             >
-              {/* Mobile: Square layout without zoom */}
-              <div className="sm:hidden flex flex-col flex-1">
+              {/* Mobile: Square cards with fixed aspect ratio */}
+              <div className="sm:hidden flex flex-col">
                 {option.image && (
-                  <div className="w-full flex-1 flex items-center justify-center p-2">
+                  <div className="w-full aspect-square flex items-center justify-center p-2">
                     <ProductImage
                       src={option.image}
                       alt={option.title}
                       type="design"
-                      width={250}
-                      height={250}
+                      width={180}
+                      height={180}
                       className="max-w-full max-h-full object-contain"
                     />
                   </div>
                 )}
-                <p className="font-medium text-gray-900 text-xs px-1 py-1 line-clamp-2 text-center">
-                  {option.title}{option.price > 0 ? ` ($${option.price})` : ''}
-                </p>
+                <div className="h-10 flex items-center justify-center px-1">
+                  <p className="font-medium text-gray-900 text-xs line-clamp-2 text-center">
+                    {option.title}{option.price > 0 ? ` ($${option.price})` : ''}
+                  </p>
+                </div>
                 {isSelected && (
                   <div className="absolute top-1 right-1 w-5 h-5 bg-primary-600 rounded-full flex items-center justify-center">
                     <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
@@ -104,18 +106,21 @@ export default function DesignOptionsSelector({
                 )}
               </div>
 
-              {/* Desktop: Square layout with zoom on hover */}
+              {/* Desktop: Reduced image size (85% of previous), 2x zoom */}
               <div className="hidden sm:flex flex-col flex-1">
                 {option.image && (
-                  <div className="w-full flex-1 flex items-center justify-center p-2">
-                    <ProductImageWithZoom
-                      src={option.image}
-                      alt={option.title}
-                      type="design"
-                      width={250}
-                      height={250}
-                      className="max-w-full max-h-full object-contain"
-                    />
+                  <div className="w-full flex-1 flex items-center justify-center p-3">
+                    <div className="w-[85%] h-[85%] flex items-center justify-center">
+                      <ProductImageWithZoom
+                        src={option.image}
+                        alt={option.title}
+                        type="design"
+                        width={212}
+                        height={212}
+                        zoomScale={2}
+                        className="max-w-full max-h-full object-contain"
+                      />
+                    </div>
                   </div>
                 )}
                 <p className="font-medium text-gray-900 text-xs px-1 py-1 line-clamp-2 text-center">
