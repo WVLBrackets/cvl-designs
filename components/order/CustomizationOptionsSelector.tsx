@@ -51,22 +51,29 @@ export default function CustomizationOptionsSelector({
   const canSelectMultiple = product.customizationSelectionMode === 'Multi'
   const isRequired = product.customizationRequired
   
-  // Check if filled: at least one option selected AND all required inputs are complete
+  // Helper function to validate if a string is a valid number
+  const isValidNumber = (value: string | undefined): boolean => {
+    if (!value || value.trim() === '') return false
+    // Check if it's a valid number (allows integers and decimals)
+    return /^\d+(\.\d+)?$/.test(value.trim())
+  }
+
+  // Check if filled: at least one option selected AND all required inputs are complete and valid
   const isFilled = selectedOptions.length > 0 && selectedOptions.every(optNum => {
     const option = productOptions.find(o => o.number === optNum)
     if (!option) return false
     
     const data = customizationData.find(d => d.optionNumber === optNum)
     
-    // If option requires input, check that the required fields are filled
+    // If option requires input, check that the required fields are filled and valid
     if (option.requiresInput === 'name') {
-      return !!(data?.customName)
+      return !!(data?.customName && data.customName.trim())
     }
     if (option.requiresInput === 'number') {
-      return !!(data?.customNumber)
+      return isValidNumber(data?.customNumber)
     }
     if (option.requiresInput === 'both') {
-      return !!(data?.customName && data?.customNumber)
+      return !!(data?.customName && data.customName.trim() && isValidNumber(data?.customNumber))
     }
     
     // No input required, so it's complete
@@ -195,13 +202,22 @@ export default function CustomizationOptionsSelector({
                           Player Number *
                         </label>
                         <input
-                          type="text"
+                          type="tel"
+                          inputMode="numeric"
+                          pattern="[0-9]*"
                           value={data?.customNumber || ''}
                           onChange={(e) => onDataChange(option.number, 'customNumber', e.target.value)}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                          className={`w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-primary-500 ${
+                            data?.customNumber && !isValidNumber(data.customNumber)
+                              ? 'border-red-500 bg-red-50'
+                              : 'border-gray-300'
+                          }`}
                           placeholder="Enter player number"
                           onClick={(e) => e.stopPropagation()}
                         />
+                        {data?.customNumber && !isValidNumber(data.customNumber) && (
+                          <p className="text-red-600 text-xs mt-1">Please enter a valid number</p>
+                        )}
                       </div>
                     )}
                   </div>
