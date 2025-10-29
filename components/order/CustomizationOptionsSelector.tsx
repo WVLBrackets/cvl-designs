@@ -118,20 +118,20 @@ export default function CustomizationOptionsSelector({
                   className="w-full relative flex flex-col flex-1"
                 >
                   {/* Mobile: Square layout without zoom */}
-                  <div className="sm:hidden flex flex-col flex-1 items-center text-center">
+                  <div className="sm:hidden flex flex-col flex-1">
                     {option.image && (
-                      <div className="w-full aspect-square flex items-center justify-center overflow-hidden">
+                      <div className="w-full flex-1 flex items-center justify-center p-1">
                         <ProductImage
                           src={option.image}
                           alt={option.title}
                           type="customization"
-                          width={200}
-                          height={200}
-                          className="w-full h-full object-cover"
+                          width={300}
+                          height={300}
+                          className="max-w-full max-h-full object-contain"
                         />
                       </div>
                     )}
-                    <p className="font-medium text-gray-900 text-xs mt-1 px-1 line-clamp-2">
+                    <p className="font-medium text-gray-900 text-xs px-1 py-1 line-clamp-2 text-center">
                       {option.title}{option.price > 0 ? ` ($${option.price})` : ''}
                     </p>
                     {isSelected && (
@@ -144,20 +144,20 @@ export default function CustomizationOptionsSelector({
                   </div>
 
                   {/* Desktop: Square layout with zoom on hover */}
-                  <div className="hidden sm:flex flex-col flex-1 items-center text-center">
+                  <div className="hidden sm:flex flex-col flex-1">
                     {option.image && (
-                      <div className="w-full aspect-square flex items-center justify-center overflow-hidden">
+                      <div className="w-full flex-1 flex items-center justify-center p-1">
                         <ProductImageWithZoom
                           src={option.image}
                           alt={option.title}
                           type="customization"
-                          width={200}
-                          height={200}
-                          className="w-full h-full object-cover"
+                          width={300}
+                          height={300}
+                          className="max-w-full max-h-full object-contain"
                         />
                       </div>
                     )}
-                    <p className="font-medium text-gray-900 text-xs mt-1 px-1 line-clamp-2">
+                    <p className="font-medium text-gray-900 text-xs px-1 py-1 line-clamp-2 text-center">
                       {option.title}{option.price > 0 ? ` ($${option.price})` : ''}
                     </p>
                     {isSelected && (
