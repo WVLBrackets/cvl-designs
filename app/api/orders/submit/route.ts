@@ -1,110 +1,216 @@
 /**
  * API Route for submitting orders
- * Handles: Google Sheets logging, PDF generation, customer email, admin notification
- * Note: Google Drive backup removed due to service account storage quota limitations
+ * Handles: Input validation, rate limiting, price verification,
+ *          Google Sheets logging, PDF generation, customer email, admin notification
+ * 
+ * Security measures:
+ * - Zod schema validation for all input data
+ * - Rate limiting (3 orders per IP per minute)
+ * - Price verification against product catalog
+ * - Input sanitization (HTML stripping, length limits)
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { submitOrder, fetchConfiguration, fetchMergedConfigForStore } from '@/lib/googleSheets'
+import { submitOrder, fetchConfiguration, fetchMergedConfigForStore, fetchProducts, fetchDesignOptions, fetchCustomizationOptions } from '@/lib/googleSheets'
 import { getEnvironment } from '@/lib/config'
 import { generateOrderNumber, getShortOrderNumber } from '@/lib/orderNumber'
 import { generateInvoicePDFBuffer } from '@/lib/invoiceGenerator'
 import { sendEmail } from '@/lib/email'
 import { generateCustomerEmail, generateAdminEmail, generateTechSupportEmail } from '@/lib/emailTemplates'
 import { logOrderError, logEmailError } from '@/lib/errorLogger'
+import { validateOrderSubmission, verifyPrices, ValidatedOrderSubmission } from '@/lib/validation'
+import { checkRateLimit, getClientIP, ORDER_RATE_LIMIT, getRateLimitHeaders } from '@/lib/rateLimit'
 import type { Order } from '@/lib/types'
 
 export async function POST(request: NextRequest) {
   const startTime = new Date()
   let orderData: any = null
+  let clientIP = 'unknown'
   
   try {
-    const body = await request.json()
-    orderData = body
+    // ========================================
+    // STEP 1: Rate Limiting
+    // ========================================
+    clientIP = getClientIP(request)
+    console.log(`[Order API] Request from IP: ${clientIP}`)
     
-    // Validate required fields
-    if (!body.contactInfo || !body.items || !body.totalAmount) {
+    const rateLimitResult = checkRateLimit(clientIP, ORDER_RATE_LIMIT)
+    const rateLimitHeaders = getRateLimitHeaders(rateLimitResult, ORDER_RATE_LIMIT)
+    
+    if (!rateLimitResult.allowed) {
+      console.warn(`[Order API] Rate limit exceeded for IP: ${clientIP} (${rateLimitResult.current} requests)`)
       return NextResponse.json(
-        { success: false, error: 'Missing required fields' },
-        { status: 400 }
+        { 
+          success: false, 
+          error: 'Too many orders submitted. Please wait a minute before trying again.',
+          retryAfter: Math.ceil(rateLimitResult.resetIn / 1000),
+        },
+        { 
+          status: 429,
+          headers: {
+            ...rateLimitHeaders,
+            'Retry-After': Math.ceil(rateLimitResult.resetIn / 1000).toString(),
+          },
+        }
       )
     }
     
-    // Generate unique order number
-    const fullOrderNumber = await generateOrderNumber(body.storeSlug || 'default')
+    // ========================================
+    // STEP 2: Parse and Validate Input
+    // ========================================
+    const body = await request.json()
+    orderData = body
+    
+    console.log('[Order API] Validating order submission...')
+    const validationResult = validateOrderSubmission(body)
+    
+    if (!validationResult.success || !validationResult.data) {
+      console.warn('[Order API] Validation failed:', validationResult.errors)
+      return NextResponse.json(
+        { 
+          success: false, 
+          error: 'Invalid order data',
+          details: validationResult.errors,
+        },
+        { status: 400, headers: rateLimitHeaders }
+      )
+    }
+    
+    const validatedData = validationResult.data
+    console.log('[Order API] ✓ Validation passed')
+    
+    // ========================================
+    // STEP 3: Verify Prices Against Catalog
+    // ========================================
+    console.log('[Order API] Verifying prices against product catalog...')
+    
+    const [products, designOptions, customizationOptions] = await Promise.all([
+      fetchProducts(validatedData.storeSlug),
+      fetchDesignOptions(),
+      fetchCustomizationOptions(),
+    ])
+    
+    const priceVerification = verifyPrices(
+      validatedData.items,
+      products.map(p => ({ id: p.id, price: p.price, name: p.name })),
+      designOptions.map(d => ({ number: d.number, price: d.price })),
+      customizationOptions.map(c => ({ number: c.number, price: c.price }))
+    )
+    
+    if (!priceVerification.valid) {
+      console.warn('[Order API] Price verification failed:', priceVerification.discrepancies)
+      
+      // Log potential tampering attempt
+      logOrderError(
+        'PRICE_TAMPERING',
+        'Price Verification',
+        new Error(`Price discrepancies detected: ${priceVerification.discrepancies.join('; ')}`),
+        { ...orderData, clientIP }
+      )
+      
+      return NextResponse.json(
+        { 
+          success: false, 
+          error: 'Price verification failed. Please refresh the page and try again.',
+          // Don't expose detailed price discrepancies to potential attackers
+        },
+        { status: 400, headers: rateLimitHeaders }
+      )
+    }
+    
+    console.log('[Order API] ✓ Price verification passed')
+    
+    // ========================================
+    // STEP 4: Recalculate Order Total (Server-Side)
+    // ========================================
+    // Always use server-calculated totals, never trust client-submitted totals
+    const serverCalculatedTotal = validatedData.items.reduce((sum, item) => {
+      const product = products.find(p => p.id === item.productId)
+      if (!product) return sum
+      
+      const designTotal = item.designOptions.reduce((dSum, opt) => {
+        const dOpt = designOptions.find(d => d.number === opt.optionNumber)
+        return dSum + (dOpt?.price || 0)
+      }, 0)
+      
+      const customTotal = item.customizationOptions.reduce((cSum, opt) => {
+        const cOpt = customizationOptions.find(c => c.number === opt.optionNumber)
+        return cSum + (cOpt?.price || 0)
+      }, 0)
+      
+      const itemTotal = (product.price + designTotal + customTotal) * item.quantity
+      return sum + itemTotal
+    }, 0)
+    
+    console.log(`[Order API] Server-calculated total: $${serverCalculatedTotal.toFixed(2)} (submitted: $${validatedData.totalAmount.toFixed(2)})`)
+    
+    // ========================================
+    // STEP 5: Generate Order Number
+    // ========================================
+    const fullOrderNumber = await generateOrderNumber(validatedData.storeSlug || 'default')
     const shortOrderNumber = getShortOrderNumber(fullOrderNumber)
     
-    // Create order object with order number
+    console.log(`[Order API] Generated order number: ${fullOrderNumber}`)
+    
+    // ========================================
+    // STEP 6: Create Order Object
+    // ========================================
     const order: Order & { orderNumber: string; shortOrderNumber: string } = {
-      contactInfo: body.contactInfo,
-      items: body.items,
-      totalAmount: body.totalAmount,
+      contactInfo: validatedData.contactInfo,
+      items: validatedData.items,
+      totalAmount: serverCalculatedTotal, // Use server-calculated total
       orderDate: new Date().toISOString(),
       environment: getEnvironment(),
-      storeSlug: body.storeSlug || '',
+      storeSlug: validatedData.storeSlug || '',
       orderNumber: fullOrderNumber,
       shortOrderNumber,
     }
     
-    // Fetch configuration (for emails and PDF)
-    const config = await fetchMergedConfigForStore(body.storeSlug || '')
+    // ========================================
+    // STEP 7: Fetch Configuration
+    // ========================================
+    const config = await fetchMergedConfigForStore(validatedData.storeSlug || '')
     
-    // Process order and WAIT for completion (Vercel serverless needs this)
+    // ========================================
+    // STEP 8: Process Order
+    // ========================================
     console.log(`[${fullOrderNumber}] Starting order processing...`)
-    console.log(`[${fullOrderNumber}] Config loaded:`, {
-      hasBusinessName: !!(config['Business Name'] || config.Business_Name),
-      hasContactEmail: !!(config.ContactMeEmail || config.Contact_Me_Email),
-      hasTechSupportEmail: !!('Tech_Support_Email' in config ? config.Tech_Support_Email : undefined),
-      hasVenmo: !!config.Venmo_Handle,
-      hasGmailUser: !!process.env.GMAIL_USER,
-      hasGmailPassword: !!process.env.GMAIL_APP_PASSWORD,
-    })
     
     try {
       await processOrderAsync(order, config)
       console.log(`[${fullOrderNumber}] ✅ Order processing complete`)
     } catch (error) {
       console.error(`[${fullOrderNumber}] ❌ Order processing failed:`, error)
-      console.error('Error stack:', error instanceof Error ? error.stack : 'N/A')
-      console.error('Error details:', {
-        name: error instanceof Error ? error.name : 'Unknown',
-        message: error instanceof Error ? error.message : String(error),
-        code: (error as any)?.code,
-      })
       
       // Log error to file
-      logOrderError(fullOrderNumber, 'Order Processing', error, order).catch(logErr => {
-        console.error('Failed to log error:', logErr)
-      })
+      logOrderError(fullOrderNumber, 'Order Processing', error, { ...order, clientIP })
       
       // Send tech support email about the failure
       sendTechSupportEmail(error, order, config).catch(err => {
         console.error('Failed to send tech support email:', err)
-        const techEmail = 'Tech_Support_Email' in config ? String(config.Tech_Support_Email || 'unknown') : 'unknown'
-        logEmailError(techEmail, 'Tech Support Error Notification', err).catch(logErr => {
-          console.error('Failed to log email error:', logErr)
-        })
       })
     }
     
-    // Return success to user (after processing completes)
-    return NextResponse.json({
-      success: true,
-      orderNumber: shortOrderNumber,
-    })
+    // Return success with rate limit headers
+    return NextResponse.json(
+      {
+        success: true,
+        orderNumber: shortOrderNumber,
+      },
+      { headers: rateLimitHeaders }
+    )
     
   } catch (error) {
     console.error('Error in order submission:', error)
     
     // Log error to file
-    logOrderError('UNKNOWN', 'Order Submission', error, orderData)
+    logOrderError('UNKNOWN', 'Order Submission', error, { ...orderData, clientIP })
     
     // Send tech support email
     if (orderData) {
       const config = await fetchConfiguration().catch(() => ({}))
       await sendTechSupportEmail(error, orderData, config).catch(err => {
-        const techEmail = 'Tech_Support_Email' in config ? String(config.Tech_Support_Email || 'unknown') : 'unknown'
-        logEmailError(techEmail, 'Tech Support Error Notification', err)
+        console.error('Failed to send tech support email:', err)
       })
     }
     
@@ -133,14 +239,11 @@ async function processOrderAsync(
   const stepTimings: any = {}
   const startTime = Date.now()
   
-  // All features enabled
-  
   try {
     // Step 1: Submit to Google Sheets FIRST (most critical - capture the order!)
     if (FEATURE_FLAGS.ENABLE_GOOGLE_SHEETS) {
       console.log(`[${order.orderNumber}] Step 1: Submitting to Google Sheets (PRIORITY)...`)
       const step1Start = Date.now()
-      // Don't include invoice filename yet - we'll add it in step 3
       ;(order as any).invoiceFilename = 'Pending...'
       const sheetResult = await submitOrder(order)
       stepTimings.googleSheets = Date.now() - step1Start
@@ -149,10 +252,10 @@ async function processOrderAsync(
       }
       console.log(`[${order.orderNumber}] ✓ Order saved to Google Sheets in ${stepTimings.googleSheets}ms`)
     } else {
-      console.log(`[${order.orderNumber}] ⏭️  Step 1: Google Sheets SKIPPED (FEATURE_FLAGS.ENABLE_GOOGLE_SHEETS = false)`)
+      console.log(`[${order.orderNumber}] ⏭️  Step 1: Google Sheets SKIPPED`)
     }
     
-    // Step 2: Generate Invoice PDF as Buffer (using professional template by default)
+    // Step 2: Generate Invoice PDF as Buffer
     let pdfBuffer: Buffer | null = null
     let invoiceFilename = 'invoice.pdf'
     
@@ -162,13 +265,12 @@ async function processOrderAsync(
       pdfBuffer = await generateInvoicePDFBuffer(order, 'professional', config)
       stepTimings.pdfGeneration = Date.now() - step2Start
       
-      // Generate filename for tracking
       const customerLastName = order.contactInfo.parentLastName.replace(/[^a-zA-Z0-9]/g, '')
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-').replace('T', '_').split('Z')[0]
       invoiceFilename = `Invoice_${order.orderNumber}_${customerLastName}_${timestamp}_${order.environment}.pdf`
       console.log(`[${order.orderNumber}] ✓ PDF generated in ${stepTimings.pdfGeneration}ms (${pdfBuffer.length} bytes)`)
     } else {
-      console.log(`[${order.orderNumber}] ⏭️  Step 2: PDF generation SKIPPED (FEATURE_FLAGS.ENABLE_PDF_GENERATION = false)`)
+      console.log(`[${order.orderNumber}] ⏭️  Step 2: PDF generation SKIPPED`)
     }
     
     // Step 3: Send customer confirmation email with PDF attachment
@@ -205,7 +307,7 @@ async function processOrderAsync(
       stepTimings.customerEmail = Date.now() - step3Start
       console.log(`[${order.orderNumber}] ✓ Customer email sent in ${stepTimings.customerEmail}ms`)
     } else {
-      console.log(`[${order.orderNumber}] ⏭️  Step 3: Customer email SKIPPED (FEATURE_FLAGS.ENABLE_CUSTOMER_EMAIL = false)`)
+      console.log(`[${order.orderNumber}] ⏭️  Step 3: Customer email SKIPPED`)
     }
     
     // Step 4: Send admin notification email with PDF attachment
@@ -214,7 +316,6 @@ async function processOrderAsync(
       const step4Start = Date.now()
       const adminEmail = config.ContactMeEmail || config.Contact_Me_Email
       if (adminEmail) {
-        console.log(`[${order.orderNumber}] Admin email: ${adminEmail}`)
         const adminEmailHtml = generateAdminEmail({
           customerName: `${order.contactInfo.parentFirstName} ${order.contactInfo.parentLastName}`,
           customerEmail: order.contactInfo.email,
@@ -248,7 +349,7 @@ async function processOrderAsync(
         console.log(`[${order.orderNumber}] ⚠️ No admin email configured, skipping admin notification`)
       }
     } else {
-      console.log(`[${order.orderNumber}] ⏭️  Step 4: Admin email SKIPPED (FEATURE_FLAGS.ENABLE_ADMIN_EMAIL = false)`)
+      console.log(`[${order.orderNumber}] ⏭️  Step 4: Admin email SKIPPED`)
     }
     
     stepTimings.total = Date.now() - startTime
@@ -257,10 +358,7 @@ async function processOrderAsync(
     
   } catch (error) {
     console.error(`[${order.orderNumber}] ❌ Order processing failed:`, error)
-    
-    // Log error to file with full context
     logOrderError(order.orderNumber, 'Order Processing', error, order)
-    
     throw error
   }
 }
@@ -294,4 +392,3 @@ async function sendTechSupportEmail(error: any, orderData: any, config: any) {
     console.error('Failed to send tech support email:', emailError)
   }
 }
-
