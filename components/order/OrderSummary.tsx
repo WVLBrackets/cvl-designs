@@ -246,9 +246,15 @@ export default function OrderSummary({
               {isExpanded && (
                 <div className="mt-3 pl-8 space-y-2 text-sm border-t pt-3">
                   <div className="flex justify-between text-gray-700">
-                    <span>Base Price (per unit):</span>
+                    <span>Item Price ({item.size}):</span>
                     <span>${item.itemPrice.toFixed(2)}</span>
                   </div>
+                  {/* Show size upcharge breakdown if applicable */}
+                  {item.sizeUpcharge > 0 && (
+                    <div className="text-xs text-gray-500 -mt-1">
+                      (includes +${item.sizeUpcharge.toFixed(2)} size upcharge)
+                    </div>
+                  )}
                   
                   {/* Design Options */}
                   {item.designOptions.length > 0 && (

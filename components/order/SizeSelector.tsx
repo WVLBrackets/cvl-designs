@@ -1,17 +1,18 @@
 /**
  * Size Selector Component
+ * Displays available sizes with optional upcharge pricing
  */
 
 'use client'
 
 import { useState } from 'react'
-import type { Product } from '@/lib/types'
+import type { Product, SizeWithPrice } from '@/lib/types'
 import Image from 'next/image'
 
 interface SizeSelectorProps {
   product: Product
   selectedSize: string
-  onSelect: (size: string) => void
+  onSelect: (size: string, upcharge: number) => void // Updated to include upcharge
 }
 
 export default function SizeSelector({
@@ -52,14 +53,15 @@ export default function SizeSelector({
         </div>
       
       <div className="flex flex-wrap gap-2">
-        {product.availableSizes.map(size => {
-          const isSelected = selectedSize === size
-          const isTBD = size === 'TBD'
+        {product.availableSizes.map((sizeOption) => {
+          const isSelected = selectedSize === sizeOption.size
+          const isTBD = sizeOption.size === 'TBD'
+          const hasUpcharge = sizeOption.upcharge > 0
           
           return (
             <button
-              key={size}
-              onClick={() => !isTBD && onSelect(size)}
+              key={sizeOption.size}
+              onClick={() => !isTBD && onSelect(sizeOption.size, sizeOption.upcharge)}
               disabled={isTBD}
               className={`px-4 py-2 border-2 rounded-lg font-medium transition-all ${
                 isTBD
@@ -69,7 +71,12 @@ export default function SizeSelector({
                   : 'border-gray-300 bg-white text-gray-700 hover:border-primary-400'
               }`}
             >
-              {size}
+              {sizeOption.size}
+              {hasUpcharge && (
+                <span className={`ml-1 text-sm ${isSelected ? 'text-white' : 'text-green-600'}`}>
+                  +${sizeOption.upcharge.toFixed(0)}
+                </span>
+              )}
             </button>
           )
         })}

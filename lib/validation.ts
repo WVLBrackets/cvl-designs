@@ -104,6 +104,12 @@ export const orderItemSchema = z.object({
     .max(10)
     .transform(sanitizeString),
   
+  sizeUpcharge: z
+    .number()
+    .min(0, 'Size upcharge cannot be negative')
+    .max(100, 'Size upcharge is too high')
+    .default(0),
+  
   itemPrice: z
     .number()
     .min(0, 'Item price cannot be negative')
@@ -183,16 +189,24 @@ export function validateOrderSubmission(data: unknown): {
 }
 
 /**
+ * Size with upcharge info for price verification
+ */
+interface SizeInfo {
+  size: string
+  upcharge: number
+}
+
+/**
  * Verify that submitted prices match the product catalog
  * @param items - Order items to verify
- * @param products - Product catalog from Google Sheets
+ * @param products - Product catalog from Google Sheets (with size pricing)
  * @param designOptions - Design options from reference data
  * @param customizationOptions - Customization options from reference data
  * @returns Object with success status and any price discrepancies found
  */
 export function verifyPrices(
   items: ValidatedOrderItem[],
-  products: Array<{ id: string; price: number; name: string }>,
+  products: Array<{ id: string; price: number; name: string; availableSizes?: SizeInfo[] }>,
   designOptions: Array<{ number: number; price: number }>,
   customizationOptions: Array<{ number: number; price: number }>
 ): { valid: boolean; discrepancies: string[] } {
@@ -207,10 +221,23 @@ export function verifyPrices(
       continue
     }
     
-    // Verify base price
-    if (Math.abs(item.itemPrice - product.price) > 0.01) {
+    // Find the size and its upcharge
+    const sizeInfo = product.availableSizes?.find(s => s.size === item.size)
+    const expectedSizeUpcharge = sizeInfo?.upcharge || 0
+    const submittedSizeUpcharge = item.sizeUpcharge || 0
+    
+    // Verify size upcharge
+    if (Math.abs(submittedSizeUpcharge - expectedSizeUpcharge) > 0.01) {
       discrepancies.push(
-        `Price mismatch for ${product.name}: submitted $${item.itemPrice}, actual $${product.price}`
+        `Size upcharge mismatch for ${product.name} (${item.size}): submitted $${submittedSizeUpcharge}, actual $${expectedSizeUpcharge}`
+      )
+    }
+    
+    // Verify item price (base price + size upcharge)
+    const expectedItemPrice = product.price + expectedSizeUpcharge
+    if (Math.abs(item.itemPrice - expectedItemPrice) > 0.01) {
+      discrepancies.push(
+        `Item price mismatch for ${product.name}: submitted $${item.itemPrice}, expected $${expectedItemPrice} (base $${product.price} + size $${expectedSizeUpcharge})`
       )
     }
     
@@ -242,8 +269,8 @@ export function verifyPrices(
       }
     }
     
-    // Verify item total
-    const expectedTotal = product.price + expectedDesignTotal + expectedCustomTotal
+    // Verify item total (item price already includes size upcharge)
+    const expectedTotal = expectedItemPrice + expectedDesignTotal + expectedCustomTotal
     if (Math.abs(item.totalPrice - expectedTotal) > 0.01) {
       discrepancies.push(
         `Item total mismatch for ${product.name}: submitted $${item.totalPrice}, expected $${expectedTotal}`

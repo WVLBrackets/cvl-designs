@@ -92,7 +92,7 @@ export async function POST(request: NextRequest) {
     
     const priceVerification = verifyPrices(
       validatedData.items,
-      products.map(p => ({ id: p.id, price: p.price, name: p.name })),
+      products.map(p => ({ id: p.id, price: p.price, name: p.name, availableSizes: p.availableSizes })),
       designOptions.map(d => ({ number: d.number, price: d.price })),
       customizationOptions.map(c => ({ number: c.number, price: c.price }))
     )
@@ -128,6 +128,10 @@ export async function POST(request: NextRequest) {
       const product = products.find(p => p.id === item.productId)
       if (!product) return sum
       
+      // Get size upcharge from product's availableSizes
+      const sizeInfo = product.availableSizes.find(s => s.size === item.size)
+      const sizeUpcharge = sizeInfo?.upcharge || 0
+      
       const designTotal = item.designOptions.reduce((dSum, opt) => {
         const dOpt = designOptions.find(d => d.number === opt.optionNumber)
         return dSum + (dOpt?.price || 0)
@@ -138,7 +142,8 @@ export async function POST(request: NextRequest) {
         return cSum + (cOpt?.price || 0)
       }, 0)
       
-      const itemTotal = (product.price + designTotal + customTotal) * item.quantity
+      // Item price = base price + size upcharge
+      const itemTotal = (product.price + sizeUpcharge + designTotal + customTotal) * item.quantity
       return sum + itemTotal
     }, 0)
     

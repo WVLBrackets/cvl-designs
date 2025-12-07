@@ -121,6 +121,43 @@ function isCellChecked(value: any): boolean {
 }
 
 /**
+ * Parse a size cell value to determine availability and upcharge
+ * @param value - Cell value from spreadsheet
+ * @returns { available: boolean, upcharge: number } or null if not available
+ * 
+ * Cell value interpretation:
+ * - Empty/null: Not available
+ * - "x" or "X": Available, no upcharge
+ * - "0": Available, no upcharge  
+ * - Any positive number (e.g., "2", "3.50"): Available with that $ upcharge
+ */
+function parseSizeCell(value: any): { available: boolean; upcharge: number } | null {
+  if (!value) return null
+  
+  const str = String(value).trim()
+  if (!str) return null
+  
+  // Check for "x" or "X" (available, no upcharge)
+  if (str.toLowerCase() === 'x') {
+    return { available: true, upcharge: 0 }
+  }
+  
+  // Try to parse as a number
+  const num = parseFloat(str)
+  if (!isNaN(num)) {
+    // Any number (including 0) means available
+    return { available: true, upcharge: Math.max(0, num) }
+  }
+  
+  // If it's "true" or "1", treat as available with no upcharge (legacy support)
+  if (str.toLowerCase() === 'true' || str === '1') {
+    return { available: true, upcharge: 0 }
+  }
+  
+  return null
+}
+
+/**
  * Fetch configuration from Google Sheets
  */
 export async function fetchConfiguration(): Promise<SiteConfiguration> {
@@ -325,12 +362,13 @@ export async function fetchProducts(storeSlug?: string): Promise<Product[]> {
       const category = row[5] ? String(row[5]) : 'uncategorized' // Column F
       const image = row[6] ? String(row[6]) : undefined // Column G
       
-      // Sizes: Columns G-N (indices 6-13)
+      // Sizes: Columns H-O (indices 7-14) with upcharge support
       const sizeLabels = ['XS', 'S', 'M', 'L', 'XL', '2XL', '3XL', 'TBD']
-      const availableSizes: string[] = []
+      const availableSizes: { size: string; upcharge: number }[] = []
       sizeLabels.forEach((label, idx) => {
-        if (isCellChecked(row[7 + idx])) { // shift by 1
-          availableSizes.push(label)
+        const sizeData = parseSizeCell(row[7 + idx]) // shift by 1 for 0-indexed
+        if (sizeData?.available) {
+          availableSizes.push({ size: label, upcharge: sizeData.upcharge })
         }
       })
       

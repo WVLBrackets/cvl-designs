@@ -64,6 +64,7 @@ interface NewOrderFormProps {
 interface CurrentItemState {
   product: Product | null
   size: string
+  sizeUpcharge: number // Additional cost for selected size (e.g., +$2 for 2XL)
   selectedDesignOptions: number[]
   selectedCustomizationOptions: number[]
   customizationData: { optionNumber: number; customName?: string; customNumber?: string }[]
@@ -123,6 +124,7 @@ export default function NewOrderForm({
   const [currentItem, setCurrentItem] = useState<CurrentItemState>({
     product: null,
     size: '',
+    sizeUpcharge: 0,
     selectedDesignOptions: [],
     selectedCustomizationOptions: [],
     customizationData: [],
@@ -375,17 +377,21 @@ export default function NewOrderForm({
     )
     const customizationOptionsTotal = selectedCustom.reduce((sum, opt) => sum + opt.price, 0)
     
+    // Calculate item price (base price + size upcharge, combined per Option A)
+    const itemPrice = currentItem.product.price + currentItem.sizeUpcharge
+    
     const newItem: OrderItem = {
       productId: currentItem.product.id,
       productName: currentItem.product.name,
       size: currentItem.size || 'N/A',
-      itemPrice: currentItem.product.price,
+      sizeUpcharge: currentItem.sizeUpcharge,
+      itemPrice: itemPrice, // Combined: base price + size upcharge
       quantity: 1,
       designOptions: selectedDesign,
       designOptionsTotal,
       customizationOptions: selectedCustom,
       customizationOptionsTotal,
-      totalPrice: currentItem.product.price + designOptionsTotal + customizationOptionsTotal,
+      totalPrice: itemPrice + designOptionsTotal + customizationOptionsTotal,
     }
     
     if (editingIndex !== null) {
@@ -403,6 +409,7 @@ export default function NewOrderForm({
     setCurrentItem({
       product: null,
       size: '',
+      sizeUpcharge: 0,
       selectedDesignOptions: [],
       selectedCustomizationOptions: [],
       customizationData: [],
@@ -439,6 +446,7 @@ export default function NewOrderForm({
     setCurrentItem({
       product,
       size: item.size,
+      sizeUpcharge: item.sizeUpcharge || 0,
       selectedDesignOptions: item.designOptions?.map(opt => opt.optionNumber) || [],
       selectedCustomizationOptions: item.customizationOptions?.map(opt => opt.optionNumber) || [],
       customizationData: item.customizationOptions?.map(opt => ({
@@ -501,6 +509,7 @@ export default function NewOrderForm({
     setCurrentItem({
       product: null,
       size: '',
+      sizeUpcharge: 0,
       selectedDesignOptions: [],
       selectedCustomizationOptions: [],
       customizationData: [],
@@ -661,6 +670,7 @@ export default function NewOrderForm({
                 onClick={() => setCurrentItem({
                   product: null,
                   size: '',
+                  sizeUpcharge: 0,
                   selectedDesignOptions: [],
                   selectedCustomizationOptions: [],
                   customizationData: [],
@@ -676,6 +686,7 @@ export default function NewOrderForm({
                 onClick={() => setCurrentItem({
                   product: null,
                   size: '',
+                  sizeUpcharge: 0,
                   selectedDesignOptions: [],
                   selectedCustomizationOptions: [],
                   customizationData: [],
@@ -694,7 +705,7 @@ export default function NewOrderForm({
               categories={categories}
               selectedProduct={currentItem.product}
               onSelect={(product) => {
-                setCurrentItem({ ...currentItem, product, size: '', selectedDesignOptions: [], selectedCustomizationOptions: [], customizationData: [] })
+                setCurrentItem({ ...currentItem, product, size: '', sizeUpcharge: 0, selectedDesignOptions: [], selectedCustomizationOptions: [], customizationData: [] })
                 // Scroll to catalog anchor (after customer info, before product section)
                 requestAnimationFrame(() => {
                   requestAnimationFrame(() => {
@@ -716,7 +727,7 @@ export default function NewOrderForm({
             <SizeSelector
               product={currentItem.product}
               selectedSize={currentItem.size}
-              onSelect={(size) => setCurrentItem({ ...currentItem, size })}
+              onSelect={(size, upcharge) => setCurrentItem({ ...currentItem, size, sizeUpcharge: upcharge })}
             />
           )}
           
@@ -757,6 +768,7 @@ export default function NewOrderForm({
                 setCurrentItem({
                   product: null,
                   size: '',
+                  sizeUpcharge: 0,
                   selectedDesignOptions: [],
                   selectedCustomizationOptions: [],
                   customizationData: [],

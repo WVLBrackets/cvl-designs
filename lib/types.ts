@@ -55,7 +55,7 @@ export interface Product {
   price: number
   status: ProductStatus
   image?: string
-  availableSizes: string[]
+  availableSizes: SizeWithPrice[] // Updated: now includes upcharge info
   sizingChart?: string
   
   // Design Options
@@ -70,7 +70,16 @@ export interface Product {
 }
 
 /**
- * Size option
+ * Size with optional upcharge pricing
+ * Used when sizes like 2XL, 3XL have additional cost
+ */
+export interface SizeWithPrice {
+  size: string
+  upcharge: number // 0 = no extra cost, positive number = additional cost
+}
+
+/**
+ * Size option (legacy - kept for compatibility)
  */
 export interface SizeOption {
   value: string
@@ -115,7 +124,8 @@ export interface OrderItem {
   productId: string
   productName: string
   size: string
-  itemPrice: number
+  sizeUpcharge: number // Size-based upcharge (e.g., +$2 for 2XL)
+  itemPrice: number // Base price + size upcharge (combined)
   quantity: number
   
   // Design options selected
