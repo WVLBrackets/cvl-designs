@@ -192,6 +192,58 @@ export default function NewOrderForm({
   }, [contactInfo, orderItems, step, storageKey, isHydrated])
   
   /**
+   * Browser back button handling using History API
+   * Allows browser back to navigate: product detail → catalog → storefront
+   */
+  useEffect(() => {
+    if (!isHydrated) return
+    
+    const handlePopState = (event: PopStateEvent) => {
+      const state = event.state
+      
+      // If we're in product detail mode (product selected), go back to catalog
+      if (currentItem.product) {
+        setCurrentItem({
+          product: null,
+          size: '',
+          sizeUpcharge: 0,
+          selectedDesignOptions: [],
+          selectedCustomizationOptions: [],
+          customizationData: [],
+        })
+        // Push a new state so next back goes to storefront
+        window.history.pushState({ view: 'catalog' }, '')
+        return
+      }
+      
+      // If we're in adding-item step (catalog view), go back to customer/review step
+      if (step === 'adding-item') {
+        setStep(orderItems.length > 0 ? 'review' : 'customer')
+        return
+      }
+      
+      // Otherwise, let the browser handle it normally (will navigate away)
+    }
+    
+    window.addEventListener('popstate', handlePopState)
+    return () => window.removeEventListener('popstate', handlePopState)
+  }, [isHydrated, currentItem.product, step, orderItems.length])
+  
+  /**
+   * Push history state when entering product detail mode
+   */
+  const pushProductDetailHistory = () => {
+    window.history.pushState({ view: 'detail' }, '')
+  }
+  
+  /**
+   * Push history state when entering catalog mode
+   */
+  const pushCatalogHistory = () => {
+    window.history.pushState({ view: 'catalog' }, '')
+  }
+  
+  /**
    * Clear saved state (call this after successful submission)
    */
   const clearSavedOrder = () => {
@@ -458,6 +510,8 @@ export default function NewOrderForm({
     
     setEditingIndex(index)
     setStep('adding-item')
+    // Push history state so browser back returns to review
+    pushCatalogHistory()
   }
 
   /**
@@ -706,6 +760,8 @@ export default function NewOrderForm({
               selectedProduct={currentItem.product}
               onSelect={(product) => {
                 setCurrentItem({ ...currentItem, product, size: '', sizeUpcharge: 0, selectedDesignOptions: [], selectedCustomizationOptions: [], customizationData: [] })
+                // Push history state so browser back returns to catalog
+                pushProductDetailHistory()
                 // Scroll to catalog anchor (after customer info, before product section)
                 requestAnimationFrame(() => {
                   requestAnimationFrame(() => {
@@ -809,6 +865,8 @@ export default function NewOrderForm({
           <button
             onClick={() => {
               setStep('adding-item')
+              // Push history state so browser back returns to storefront
+              pushCatalogHistory()
               // Clear submission status when starting a new order
               setSubmitStatus(null)
               setHasSubmittedOrder(false)
