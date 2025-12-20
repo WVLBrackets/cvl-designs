@@ -63,7 +63,7 @@ export default function SizeSelector({
               key={sizeOption.size}
               onClick={() => !isTBD && onSelect(sizeOption.size, sizeOption.upcharge)}
               disabled={isTBD}
-              className={`px-4 py-2 border-2 rounded-lg font-medium transition-all ${
+              className={`min-w-[48px] px-3 py-2 border-2 rounded-lg font-medium transition-all flex flex-col items-center justify-center ${
                 isTBD
                   ? 'border-gray-200 bg-gray-100 text-gray-400 cursor-not-allowed'
                   : isSelected
@@ -71,9 +71,9 @@ export default function SizeSelector({
                   : 'border-gray-300 bg-white text-gray-700 hover:border-primary-400'
               }`}
             >
-              {sizeOption.size}
+              <span>{sizeOption.size}</span>
               {hasUpcharge && (
-                <span className={`ml-1 text-sm ${isSelected ? 'text-white' : 'text-green-600'}`}>
+                <span className={`text-xs ${isSelected ? 'text-white/90' : 'text-green-600'}`}>
                   +${sizeOption.upcharge.toFixed(0)}
                 </span>
               )}
