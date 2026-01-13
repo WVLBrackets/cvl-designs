@@ -40,7 +40,7 @@ export default function SizeSelector({
       <div className="space-y-3">
         <div className="flex items-center gap-2">
           <h3 className="text-lg font-semibold text-gray-900">
-            Select Size {isComplete ? <span className="text-green-600">✓</span> : <span className="text-red-600">*</span>}
+            Select Size (You can select quantity on the next screen.) {isComplete ? <span className="text-green-600">✓</span> : <span className="text-red-600">*</span>}
           </h3>
           {product.sizingChart && (
             <button
