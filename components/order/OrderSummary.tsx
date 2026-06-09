@@ -290,7 +290,7 @@ export default function OrderSummary({
                   )}
                   {/* Show size upcharge breakdown if applicable */}
                   {item.sizeUpcharge > 0 && (
-                    <div className="text-xs text-gray-500 -mt-1">
+                    <div className="text-xs text-gray-500 pl-4">
                       (includes +${item.sizeUpcharge.toFixed(2)} size upcharge)
                     </div>
                   )}
