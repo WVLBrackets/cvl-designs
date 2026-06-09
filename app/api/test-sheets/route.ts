@@ -4,11 +4,16 @@
 
 import { NextResponse } from 'next/server'
 import { fetchConfiguration, fetchStores } from '@/lib/googleSheets'
+import { getEnvironment } from '@/lib/config'
 
 export async function GET() {
   const results: any = {
     timestamp: new Date().toISOString(),
     environment: process.env.NODE_ENV,
+    NEXT_PUBLIC_SITE_ENV: process.env.NEXT_PUBLIC_SITE_ENV ?? '(not set)',
+    VERCEL_ENV: process.env.VERCEL_ENV ?? '(not set)',
+    resolvedEnvironment: getEnvironment(),
+    draftProductsHidden: getEnvironment() === 'production',
     envVarsPresent: {
       GOOGLE_SERVICE_ACCOUNT_EMAIL: !!process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
       GOOGLE_PRIVATE_KEY: !!process.env.GOOGLE_PRIVATE_KEY,

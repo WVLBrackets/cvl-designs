@@ -501,6 +501,149 @@ export async function fetchProducts(storeSlug?: string): Promise<Product[]> {
   }
 }
 
+export interface ProductCatalogDiagnosticRow {
+  rowNumber: number
+  name: string
+  statusRaw: string
+  statusResolved: ProductStatus
+  storeRaw: string
+  categoryRaw: string
+  passedStatusFilter: boolean
+  passedStoreFilter: boolean
+  visibleInCatalog: boolean
+  exclusionReason?: string
+}
+
+export interface ProductCatalogDiagnostics {
+  environment: {
+    NEXT_PUBLIC_SITE_ENV: string | undefined
+    VERCEL_ENV: string | undefined
+    NODE_ENV: string | undefined
+    resolvedEnvironment: 'development' | 'production'
+    draftProductsHidden: boolean
+  }
+  storeSlug: string | undefined
+  categories: Category[]
+  rows: ProductCatalogDiagnosticRow[]
+  fetchedProductCount: number
+  visibleProductCount: number
+  orphanedProducts: Array<{ name: string; category: string }>
+}
+
+/**
+ * Explain why each product row is included or excluded from the catalog.
+ * Used by the staging-only debug API route.
+ */
+export async function diagnoseProductCatalog(
+  storeSlug?: string
+): Promise<ProductCatalogDiagnostics> {
+  const environment = getEnvironment()
+  const categories = await fetchCategories()
+  const categoryIds = new Set(categories.map(c => c.id))
+  const fetchedProducts = await fetchProducts(storeSlug)
+  const fetchedNames = new Set(fetchedProducts.map(p => p.name))
+
+  const sheets = await getSheetsClient()
+  const spreadsheetId = getSheetId('products')
+  const response = await sheets.spreadsheets.values.get({
+    spreadsheetId,
+    range: 'Products!A3:AP100',
+  })
+
+  const rows = response.data.values || []
+  const dataRows = rows.slice(1)
+  const diagnosticRows: ProductCatalogDiagnosticRow[] = []
+
+  dataRows.forEach((row, index) => {
+    const rowNumber = index + 4
+    const name = row[PRODUCT_COL.NAME] ? String(row[PRODUCT_COL.NAME]).trim() : ''
+    if (!name) return
+
+    const statusRaw = row[PRODUCT_COL.STATUS] ? String(row[PRODUCT_COL.STATUS]) : '(empty → Public)'
+    const statusResolved: ProductStatus =
+      String(row[PRODUCT_COL.STATUS] || 'Public').toLowerCase().trim() === 'draft'
+        ? 'PREVIEW'
+        : 'PROD'
+    const storeRaw = row[PRODUCT_COL.STORE] ? String(row[PRODUCT_COL.STORE]) : '(empty)'
+    const categoryRaw = row[PRODUCT_COL.CATEGORY]
+      ? String(row[PRODUCT_COL.CATEGORY])
+      : 'uncategorized'
+
+    let passedStatusFilter = true
+    let passedStoreFilter = true
+    let exclusionReason: string | undefined
+
+    if (statusResolved === 'PREVIEW' && environment === 'production') {
+      passedStatusFilter = false
+      exclusionReason = 'Draft hidden because resolved environment is production'
+    }
+
+    if (passedStatusFilter && storeSlug) {
+      const tokens = storeRaw
+        .replace('(empty)', '')
+        .split(/[,\n]/)
+        .map(t => t.trim().toLowerCase())
+        .filter(Boolean)
+      const hasAll = tokens.includes('all')
+      const allowed = hasAll || tokens.includes(storeSlug.toLowerCase())
+      if (!allowed) {
+        passedStoreFilter = false
+        exclusionReason = `Store "${storeRaw}" does not include slug "${storeSlug}"`
+      }
+    } else if (passedStatusFilter && !storeSlug) {
+      const tokens = storeRaw
+        .replace('(empty)', '')
+        .split(/[,\n]/)
+        .map(t => t.trim().toLowerCase())
+        .filter(Boolean)
+      if (tokens.length > 0 && !tokens.includes('all')) {
+        passedStoreFilter = false
+        exclusionReason = 'Store-specific product hidden when no ?store= slug is provided'
+      }
+    }
+
+    const visibleInCatalog =
+      passedStatusFilter && passedStoreFilter && fetchedNames.has(name)
+
+    if (passedStatusFilter && passedStoreFilter && !visibleInCatalog) {
+      exclusionReason = 'Row passed filters but was not returned by fetchProducts (check sheet row/data)'
+    }
+
+    diagnosticRows.push({
+      rowNumber,
+      name,
+      statusRaw,
+      statusResolved,
+      storeRaw,
+      categoryRaw,
+      passedStatusFilter,
+      passedStoreFilter,
+      visibleInCatalog,
+      exclusionReason,
+    })
+  })
+
+  const orphanedProducts = fetchedProducts
+    .filter(p => !categoryIds.has(p.category))
+    .map(p => ({ name: p.name, category: p.category }))
+
+  return {
+    environment: {
+      NEXT_PUBLIC_SITE_ENV: process.env.NEXT_PUBLIC_SITE_ENV,
+      VERCEL_ENV: process.env.VERCEL_ENV,
+      NODE_ENV: process.env.NODE_ENV,
+      resolvedEnvironment: environment,
+      draftProductsHidden: environment === 'production',
+    },
+    storeSlug,
+    categories,
+    rows: diagnosticRows,
+    fetchedProductCount: fetchedProducts.length,
+    visibleProductCount: fetchedProducts.filter(p => categoryIds.has(p.category)).length,
+    orphanedProducts,
+  }
+}
+
 /**
  * Submit an order to Google Sheets
  */
