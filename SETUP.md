@@ -152,13 +152,12 @@ Row 3 contains column headers (size labels in H–Q). Data starts at row 4.
 - R: Sizing Chart filename
 - S–AP: Design and customization options (same as before)
 
-**Color variant columns (AQ–AT):**
+**Color variant columns (AQ–AS):**
 - AQ: Color Name (required for multi-color products; leave blank for single-SKU rows)
 - AR: Color Hex (optional, e.g. `#1a1a1a` for swatch UI)
 - AS: Color Upcharge (optional, default `0`)
-- AT: Color Default (`TRUE` on exactly one row per product group)
 
-**Multi-color products:** Create one row per color with the same column A name. Vary columns G, H–Q, and AQ–AS per row. The storefront groups rows into one catalog product with a color picker.
+**Multi-color products:** Create one row per color with the same column A name. List the default color first. Vary columns G, H–Q, and AQ–AS per row. The storefront groups rows into one catalog product with a color picker.
 
 **Single-color products:** One row with blank Color Name — behaves like today (no color step).
 

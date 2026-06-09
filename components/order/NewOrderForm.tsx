@@ -100,13 +100,18 @@ function createEmptyCurrentItem(): CurrentItemState {
 /**
  * Initialize current item when a catalog product is selected
  */
-function createCurrentItemForProduct(product: Product): CurrentItemState {
-  const defaultColor = getDefaultColorVariant(product)
+function createCurrentItemForProduct(
+  product: Product,
+  initialColorId?: string
+): CurrentItemState {
+  const color =
+    (initialColorId && findColorVariant(product, initialColorId)) ||
+    getDefaultColorVariant(product)
   return {
     product,
-    colorId: defaultColor?.id || '',
-    colorName: defaultColor?.name || '',
-    colorUpcharge: defaultColor?.upcharge || 0,
+    colorId: color?.id || '',
+    colorName: color?.name || '',
+    colorUpcharge: color?.upcharge || 0,
     size: '',
     sizeUpcharge: 0,
     selectedDesignOptions: [],
@@ -470,10 +475,17 @@ export default function NewOrderForm({
     const itemPrice =
       currentItem.product.price + currentItem.colorUpcharge + currentItem.sizeUpcharge
 
+    const colorVariant = findColorVariant(
+      currentItem.product,
+      currentItem.colorId,
+      currentItem.colorName
+    )
+
     const newItem: OrderItem = {
       productId: currentItem.product.id,
       productName: currentItem.product.name,
       color: currentItem.colorName || undefined,
+      colorHex: colorVariant?.hexCode,
       colorUpcharge: currentItem.colorUpcharge,
       size: currentItem.size || 'N/A',
       sizeUpcharge: currentItem.sizeUpcharge,
@@ -776,8 +788,8 @@ export default function NewOrderForm({
               categories={categories}
               selectedProduct={currentItem.product}
               selectedColorId={currentItem.colorId}
-              onSelect={(product) => {
-                setCurrentItem(createCurrentItemForProduct(product))
+              onSelect={(product, initialColorId) => {
+                setCurrentItem(createCurrentItemForProduct(product, initialColorId))
                 // Push history state so browser back returns to catalog
                 pushProductDetailHistory()
                 // Scroll to catalog anchor (after customer info, before product section)

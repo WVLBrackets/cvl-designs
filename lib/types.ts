@@ -52,7 +52,6 @@ export interface ColorVariant {
   name: string
   hexCode?: string
   upcharge: number
-  isDefault: boolean
   image?: string
   availableSizes: SizeWithPrice[]
 }
@@ -139,6 +138,7 @@ export interface OrderItem {
   productId: string
   productName: string
   color?: string
+  colorHex?: string
   colorUpcharge?: number
   size: string
   sizeUpcharge: number // Size-based upcharge (e.g., +$2 for 2XL)

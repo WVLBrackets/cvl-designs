@@ -110,7 +110,6 @@ const PRODUCT_COL = {
   COLOR_NAME: 42, // AQ
   COLOR_HEX: 43, // AR
   COLOR_UPCHARGE: 44, // AS
-  COLOR_DEFAULT: 45, // AT
 } as const
 
 const DESIGN_OPTION_COUNT = 12
@@ -423,7 +422,6 @@ interface ParsedVariantRow {
   colorName?: string
   colorHex?: string
   colorUpcharge: number
-  colorDefault: boolean
 }
 
 /**
@@ -476,7 +474,6 @@ function parseVariantRow(row: unknown[], sizeLabels: string[]): ParsedVariantRow
     colorName: colorNameRaw || undefined,
     colorHex: colorHexRaw || undefined,
     colorUpcharge: parseCurrency(row[PRODUCT_COL.COLOR_UPCHARGE]),
-    colorDefault: parseBooleanCell(row[PRODUCT_COL.COLOR_DEFAULT]),
   }
 }
 
@@ -541,20 +538,12 @@ function buildProductFromVariantGroup(
     name: variant.colorName!,
     hexCode: variant.colorHex,
     upcharge: variant.colorUpcharge,
-    isDefault: variant.colorDefault,
     image: variant.image,
     availableSizes: variant.availableSizes,
   }))
 
-  let defaultColor =
-    availableColors.find(c => c.isDefault) || availableColors[0]
-  if (!availableColors.some(c => c.isDefault) && availableColors.length > 0) {
-    defaultColor = { ...availableColors[0], isDefault: true }
-    availableColors[0] = defaultColor
-  }
-
-  const metadataRow =
-    variants.find(v => v.colorDefault && v.colorName) || colorRows[0]
+  const defaultColor = availableColors[0]
+  const metadataRow = colorRows[0]
 
   return {
     id,
@@ -587,7 +576,7 @@ export async function fetchProducts(storeSlug?: string): Promise<Product[]> {
     
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId,
-      range: 'Products!A3:AT100',
+      range: 'Products!A3:AS100',
     })
     
     const rows = response.data.values || []
@@ -689,7 +678,7 @@ export async function diagnoseProductCatalog(
   const spreadsheetId = getSheetId('products')
   const response = await sheets.spreadsheets.values.get({
     spreadsheetId,
-    range: 'Products!A3:AT100',
+    range: 'Products!A3:AS100',
   })
 
   const rows = response.data.values || []

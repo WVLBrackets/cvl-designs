@@ -6,22 +6,12 @@
 'use client'
 
 import type { Product } from '@/lib/types'
+import { normalizeHex } from '@/lib/productColors'
 
 interface ColorSelectorProps {
   product: Product
   selectedColorId: string
   onSelect: (colorId: string, colorName: string, upcharge: number) => void
-}
-
-/**
- * Normalize hex color for CSS; returns undefined if invalid
- */
-function normalizeHex(hex?: string): string | undefined {
-  if (!hex) return undefined
-  const trimmed = hex.trim()
-  if (/^#[0-9A-Fa-f]{6}$/.test(trimmed)) return trimmed
-  if (/^[0-9A-Fa-f]{6}$/.test(trimmed)) return `#${trimmed}`
-  return undefined
 }
 
 export default function ColorSelector({
@@ -57,23 +47,29 @@ export default function ColorSelector({
               key={color.id}
               type="button"
               onClick={() => onSelect(color.id, color.name, color.upcharge)}
-              className={`min-w-[72px] px-3 py-2 border-2 rounded-lg font-medium transition-all flex flex-col items-center justify-center gap-1 ${
+              className={`w-16 h-16 border-2 rounded-lg transition-all flex flex-col items-center justify-center gap-0.5 overflow-hidden ${
                 isSelected
-                  ? 'border-primary-600 bg-primary-600 text-white'
-                  : 'border-gray-300 bg-white text-gray-700 hover:border-primary-400'
+                  ? 'border-primary-600 ring-2 ring-primary-200'
+                  : 'border-gray-300 bg-white hover:border-primary-400'
               }`}
             >
               {swatchHex ? (
                 <span
-                  className="w-6 h-6 rounded-full border border-gray-300 shrink-0"
+                  className="w-5 h-5 rounded-full border border-gray-300 shrink-0"
                   style={{ backgroundColor: swatchHex }}
                   aria-hidden
                 />
               ) : null}
-              <span className="text-sm text-center leading-tight">{color.name}</span>
+              <span
+                className={`text-[9px] text-center leading-tight line-clamp-2 w-full px-0.5 ${
+                  isSelected ? 'text-primary-700 font-semibold' : 'text-gray-700'
+                }`}
+              >
+                {color.name}
+              </span>
               {hasUpcharge && (
                 <span
-                  className={`text-xs ${isSelected ? 'text-white/90' : 'text-green-600'}`}
+                  className={`text-[8px] leading-none ${isSelected ? 'text-primary-600' : 'text-green-600'}`}
                 >
                   +${color.upcharge.toFixed(0)}
                 </span>

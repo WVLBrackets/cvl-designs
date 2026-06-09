@@ -7,6 +7,7 @@
 
 import { useState } from 'react'
 import type { OrderItem } from '@/lib/types'
+import { getContrastTextColor, normalizeHex } from '@/lib/productColors'
 
 interface OrderSummaryProps {
   items: OrderItem[]
@@ -63,9 +64,37 @@ export default function OrderSummary({
   
   const totalAmount = items.reduce((sum, item) => sum + (item.totalPrice * item.quantity), 0)
 
-  const formatVariantLabel = (item: OrderItem) => {
+  const ColorNameTile = ({ item }: { item: OrderItem }) => {
+    if (!item.color) return null
+    const hex = normalizeHex(item.colorHex) || '#9ca3af'
+    const textColor = getContrastTextColor(hex)
+    return (
+      <span
+        className="inline-flex items-center justify-center px-1.5 py-0.5 rounded text-[10px] font-medium leading-none min-w-[2.75rem] h-5 align-middle"
+        style={{ backgroundColor: hex, color: textColor }}
+      >
+        {item.color}
+      </span>
+    )
+  }
+
+  const VariantLabel = ({ item }: { item: OrderItem }) => {
+    if (!item.color && !item.size) {
+      return <span className="text-sm text-gray-600">(N/A)</span>
+    }
+    return (
+      <span className="inline-flex items-center gap-1.5 text-sm text-gray-600 align-middle">
+        <span>(</span>
+        {item.color && <ColorNameTile item={item} />}
+        {item.size && <span>{item.size}</span>}
+        <span>)</span>
+      </span>
+    )
+  }
+
+  const formatExpandedVariantLabel = (item: OrderItem) => {
     const parts = [item.color, item.size].filter(Boolean)
-    return parts.length > 0 ? parts.join(' / ') : 'N/A'
+    return parts.length > 0 ? parts.join(', ') : 'N/A'
   }
   
   return (
@@ -86,7 +115,7 @@ export default function OrderSummary({
           <div className="sm:hidden space-y-2">
             {/* Row 1: Product Name and Size */}
             <div className="font-semibold text-gray-900">
-              {item.productName} <span className="text-sm text-gray-600">({formatVariantLabel(item)})</span>
+              {item.productName} <VariantLabel item={item} />
             </div>
             
             {/* Row 2: Quantity Controls and Action Buttons */}
@@ -181,7 +210,7 @@ export default function OrderSummary({
             {/* Product Name and Size - Aligned with button top */}
             <div className="flex-1 min-w-0 pt-0.5">
               <span className="font-semibold text-gray-900">{item.productName}</span>
-              <span className="text-sm text-gray-600 ml-2">({formatVariantLabel(item)})</span>
+              <span className="ml-2"><VariantLabel item={item} /></span>
             </div>
 
             {/* Quantity Controls with Label */}
@@ -251,7 +280,7 @@ export default function OrderSummary({
               {isExpanded && (
                 <div className="mt-3 pl-8 space-y-2 text-sm border-t pt-3">
                   <div className="flex justify-between text-gray-700">
-                    <span>Item Price ({formatVariantLabel(item)}):</span>
+                    <span>Item Price ({formatExpandedVariantLabel(item)}):</span>
                     <span>${item.itemPrice.toFixed(2)}</span>
                   </div>
                   {item.colorUpcharge != null && item.colorUpcharge > 0 && (

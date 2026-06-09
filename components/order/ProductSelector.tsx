@@ -4,8 +4,14 @@
 
 'use client'
 
+import { useState } from 'react'
 import type { Product, Category } from '@/lib/types'
-import { getProductDisplayImage } from '@/lib/productColors'
+import {
+  getDefaultColorVariant,
+  getProductDisplayImage,
+  normalizeHex,
+  productHasColorChoice,
+} from '@/lib/productColors'
 import ProductImage from '../ProductImage'
 import ProductImageWithZoom from '../ProductImageWithZoom'
 
@@ -14,7 +20,7 @@ interface ProductSelectorProps {
   categories: Category[]
   selectedProduct: Product | null
   selectedColorId?: string
-  onSelect: (product: Product) => void
+  onSelect: (product: Product, initialColorId?: string) => void
   detailMode?: boolean
 }
 
@@ -26,6 +32,8 @@ export default function ProductSelector({
   onSelect,
   detailMode,
 }: ProductSelectorProps) {
+  const [catalogColorIds, setCatalogColorIds] = useState<Record<string, string>>({})
+
   // Group products by category
   const productsByCategory = categories.reduce((acc, category) => {
     acc[category.id] = products.filter(p => p.category === category.id)
@@ -94,12 +102,25 @@ export default function ProductSelector({
             <h4 className="text-md font-medium text-gray-700 capitalize">{category.name}</h4>
             <div className={`grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3`}>
               {categoryProducts.map(product => {
-                const catalogImage = getProductDisplayImage(product)
+                const defaultColor = getDefaultColorVariant(product)
+                const selectedCatalogColorId =
+                  catalogColorIds[product.id] || defaultColor?.id
+                const catalogImage = getProductDisplayImage(product, selectedCatalogColorId)
+                const hasColorChoice = productHasColorChoice(product)
+
                 return (
-                  <button
+                  <div
                     key={product.id}
-                    onClick={() => onSelect(product)}
-                    className={`p-4 border-2 rounded-lg text-left transition-all border-gray-200 hover:border-primary-300 bg-white`}
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => onSelect(product, selectedCatalogColorId)}
+                    onKeyDown={event => {
+                      if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault()
+                        onSelect(product, selectedCatalogColorId)
+                      }
+                    }}
+                    className="p-4 border-2 rounded-lg text-left transition-all border-gray-200 hover:border-primary-300 bg-white cursor-pointer"
                   >
                     <div className="flex gap-3">
                       <ProductImageWithZoom
@@ -114,6 +135,40 @@ export default function ProductSelector({
                         <p className="font-semibold text-gray-900 text-sm leading-tight">{product.displayName}</p>
                         <p className="text-xs text-gray-600 capitalize mt-0.5">{category.name}</p>
                         <p className="text-xs text-gray-600 mt-0.5">Base Price: ${product.price}</p>
+                        {hasColorChoice && (
+                          <div
+                            className="flex gap-1 mt-1.5"
+                            onClick={event => event.stopPropagation()}
+                            onKeyDown={event => event.stopPropagation()}
+                          >
+                            {product.availableColors.map(color => {
+                              const isActive = selectedCatalogColorId === color.id
+                              const swatchHex = normalizeHex(color.hexCode) || '#d1d5db'
+                              return (
+                                <button
+                                  key={color.id}
+                                  type="button"
+                                  title={color.name}
+                                  aria-label={`${color.name}${isActive ? ' (selected)' : ''}`}
+                                  aria-pressed={isActive}
+                                  onClick={event => {
+                                    event.stopPropagation()
+                                    setCatalogColorIds(prev => ({
+                                      ...prev,
+                                      [product.id]: color.id,
+                                    }))
+                                  }}
+                                  className={`w-5 h-5 rounded-sm border-2 shrink-0 transition-all ${
+                                    isActive
+                                      ? 'border-primary-600 ring-1 ring-primary-300'
+                                      : 'border-gray-300 hover:border-primary-400'
+                                  }`}
+                                  style={{ backgroundColor: swatchHex }}
+                                />
+                              )
+                            })}
+                          </div>
+                        )}
                         {product.status === 'PREVIEW' && (
                           <span className="inline-block mt-1 bg-yellow-100 text-yellow-800 text-xs px-2 py-0.5 rounded self-start">
                             Preview
@@ -121,7 +176,7 @@ export default function ProductSelector({
                         )}
                       </div>
                     </div>
-                  </button>
+                  </div>
                 )
               })}
             </div>
@@ -131,4 +186,3 @@ export default function ProductSelector({
     </div>
   )
 }
-
