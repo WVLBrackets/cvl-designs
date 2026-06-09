@@ -85,15 +85,98 @@ export async function getSheetsClient() {
   return google.sheets({ version: 'v4', auth })
 }
 
+/** Products tab column indices (0-based; row 3 = headers, row 4+ = data) */
+const PRODUCT_COL = {
+  NAME: 0, // A
+  DISPLAY_NAME: 1, // B
+  STATUS: 2, // C
+  STORE: 3, // D
+  PRICE: 4, // E
+  CATEGORY: 5, // F
+  IMAGE: 6, // G
+  SIZE_START: 7, // H
+  SIZE_END: 16, // Q (10 size columns)
+  SIZING_CHART: 17, // R
+  DESIGN_REQUIRED: 18, // S
+  DESIGN_SELECTION_MODE: 19, // T
+  DESIGN_OPTIONS_START: 20, // U
+  DESIGN_OPTIONS_COUNT: 12, // U–AD
+  CUSTOMIZATION_REQUIRED: 30, // AE
+  CUSTOMIZATION_SELECTION_MODE: 31, // AF
+  CUSTOMIZATION_OPTIONS_START: 32, // AG
+  CUSTOMIZATION_OPTIONS_COUNT: 12, // AG–AP
+} as const
+
+const DESIGN_OPTION_COUNT = 12
+const CUSTOMIZATION_OPTION_COUNT = 12
+
 /**
- * Helper to convert column letter to index (A=0, B=1, etc.)
+ * Parse a True/False cell from the Products sheet
  */
-function columnToIndex(column: string): number {
-  let index = 0
-  for (let i = 0; i < column.length; i++) {
-    index = index * 26 + (column.charCodeAt(i) - 64)
+function parseBooleanCell(value: unknown): boolean {
+  if (!value) return false
+  return String(value).toLowerCase().trim() === 'true'
+}
+
+/**
+ * Parse Single / Multi / None selection mode from a Products sheet cell
+ */
+function parseSelectionMode(value: unknown): SelectionMode {
+  if (!value) return 'None'
+  const str = String(value).trim()
+  const normalized = str.charAt(0).toUpperCase() + str.slice(1).toLowerCase()
+  if (normalized === 'Single' || normalized === 'Multi' || normalized === 'None') {
+    return normalized
   }
-  return index - 1
+  return 'None'
+}
+
+/**
+ * Read size labels from Products header row (sheet row 3), columns H–Q
+ */
+function parseSizeLabelsFromHeader(headerRow: unknown[]): string[] {
+  const labels: string[] = []
+  for (let col = PRODUCT_COL.SIZE_START; col <= PRODUCT_COL.SIZE_END; col++) {
+    const label = headerRow[col] ? String(headerRow[col]).trim() : ''
+    labels.push(label)
+  }
+  return labels
+}
+
+/**
+ * Build available sizes for a product row using header labels and size column cells
+ */
+function parseAvailableSizes(
+  row: unknown[],
+  sizeLabels: string[]
+): { size: string; upcharge: number }[] {
+  const availableSizes: { size: string; upcharge: number }[] = []
+  sizeLabels.forEach((label, idx) => {
+    if (!label) return
+    const col = PRODUCT_COL.SIZE_START + idx
+    const sizeData = parseSizeCell(row[col])
+    if (sizeData?.available) {
+      availableSizes.push({ size: label, upcharge: sizeData.upcharge })
+    }
+  })
+  return availableSizes
+}
+
+/**
+ * Collect checked option numbers from a contiguous checkbox column range
+ */
+function parseCheckedOptions(
+  row: unknown[],
+  startCol: number,
+  count: number
+): number[] {
+  const options: number[] = []
+  for (let i = 0; i < count; i++) {
+    if (isCellChecked(row[startCol + i])) {
+      options.push(i + 1)
+    }
+  }
+  return options
 }
 
 /**
@@ -234,7 +317,7 @@ export async function fetchDesignOptions(): Promise<DesignOption[]> {
     
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId,
-      range: "'Reference Data'!A3:F12", // Design options table
+      range: `'Reference Data'!A3:F${2 + DESIGN_OPTION_COUNT}`, // Design options 1–12
     })
     
     const rows = response.data.values || []
@@ -270,7 +353,7 @@ export async function fetchCustomizationOptions(): Promise<CustomizationOption[]
     
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId,
-      range: "'Reference Data'!G3:L12", // Customization options table
+      range: `'Reference Data'!G3:L${2 + CUSTOMIZATION_OPTION_COUNT}`, // Customization options 1–12
     })
     
     const rows = response.data.values || []
@@ -316,23 +399,28 @@ export async function fetchProducts(storeSlug?: string): Promise<Product[]> {
     const sheets = await getSheetsClient()
     const spreadsheetId = getSheetId('products')
     
-    // Fetch the entire products table
+    // Row 3 = headers (size labels), row 4+ = product data
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId,
-      range: 'Products!A4:AM100', // Starting from row 4 (after headers)
+      range: 'Products!A3:AP100',
     })
     
     const rows = response.data.values || []
+    if (rows.length < 2) return []
+
+    const headerRow = rows[0]
+    const sizeLabels = parseSizeLabelsFromHeader(headerRow)
+    const dataRows = rows.slice(1)
     const environment = getEnvironment()
     const products: Product[] = []
     
-    rows.forEach(row => {
-      if (!row[0]) return // Skip empty rows
+    dataRows.forEach(row => {
+      if (!row[PRODUCT_COL.NAME]) return // Skip empty rows
       
-      const name = String(row[0]) // Column A
-      const displayName = row[1] ? String(row[1]) : name // Column B
-      const statusValue = row[2] ? String(row[2]) : 'Public' // Column C
-      const storeCell = row[3] ? String(row[3]) : '' // Column D: Store
+      const name = String(row[PRODUCT_COL.NAME])
+      const displayName = row[PRODUCT_COL.DISPLAY_NAME] ? String(row[PRODUCT_COL.DISPLAY_NAME]) : name
+      const statusValue = row[PRODUCT_COL.STATUS] ? String(row[PRODUCT_COL.STATUS]) : 'Public'
+      const storeCell = row[PRODUCT_COL.STORE] ? String(row[PRODUCT_COL.STORE]) : ''
       const status: ProductStatus = statusValue.toLowerCase() === 'draft' ? 'PREVIEW' : 'PROD'
       
       // Filter based on environment
@@ -358,42 +446,32 @@ export async function fetchProducts(storeSlug?: string): Promise<Product[]> {
         if (tokens.length > 0 && !tokens.includes('all')) return
       }
       
-      const price = parseCurrency(row[4]) // Column E (shifted by Store column)
-      const category = row[5] ? String(row[5]) : 'uncategorized' // Column F
-      const image = row[6] ? String(row[6]) : undefined // Column G
+      const price = parseCurrency(row[PRODUCT_COL.PRICE])
+      const category = row[PRODUCT_COL.CATEGORY] ? String(row[PRODUCT_COL.CATEGORY]) : 'uncategorized'
+      const image = row[PRODUCT_COL.IMAGE] ? String(row[PRODUCT_COL.IMAGE]) : undefined
       
-      // Sizes: Columns H-O (indices 7-14) with upcharge support
-      const sizeLabels = ['XS', 'S', 'M', 'L', 'XL', '2XL', '3XL', 'TBD']
-      const availableSizes: { size: string; upcharge: number }[] = []
-      sizeLabels.forEach((label, idx) => {
-        const sizeData = parseSizeCell(row[7 + idx]) // shift by 1 for 0-indexed
-        if (sizeData?.available) {
-          availableSizes.push({ size: label, upcharge: sizeData.upcharge })
-        }
-      })
+      const availableSizes = parseAvailableSizes(row, sizeLabels)
       
-      const sizingChart = row[15] ? String(row[15]) : undefined // Column P
-      const designRequired = row[16] ? String(row[16]).toLowerCase() === 'true' : false // Column Q
-      const designSelectionMode = (row[17] ? String(row[17]) : 'None') as SelectionMode // Column R
+      const sizingChart = row[PRODUCT_COL.SIZING_CHART]
+        ? String(row[PRODUCT_COL.SIZING_CHART]).trim()
+        : undefined
+      const designRequired = parseBooleanCell(row[PRODUCT_COL.DESIGN_REQUIRED])
+      const designSelectionMode = parseSelectionMode(row[PRODUCT_COL.DESIGN_SELECTION_MODE])
       
-      // Design options: Columns R-AA (indices 17-26)
-      const availableDesignOptions: number[] = []
-      for (let i = 0; i < 10; i++) {
-        if (isCellChecked(row[18 + i])) { // shift by 1
-          availableDesignOptions.push(i + 1)
-        }
-      }
+      const availableDesignOptions = parseCheckedOptions(
+        row,
+        PRODUCT_COL.DESIGN_OPTIONS_START,
+        PRODUCT_COL.DESIGN_OPTIONS_COUNT
+      )
       
-      const customizationRequired = row[28] ? String(row[28]).toLowerCase() === 'true' : false // Column AC
-      const customizationSelectionMode = (row[29] ? String(row[29]) : 'None') as SelectionMode // Column AD
+      const customizationRequired = parseBooleanCell(row[PRODUCT_COL.CUSTOMIZATION_REQUIRED])
+      const customizationSelectionMode = parseSelectionMode(row[PRODUCT_COL.CUSTOMIZATION_SELECTION_MODE])
       
-      // Customization options: Columns AD-AM (indices 29-38)
-      const availableCustomizationOptions: number[] = []
-      for (let i = 0; i < 10; i++) {
-        if (isCellChecked(row[30 + i])) { // shift by 1
-          availableCustomizationOptions.push(i + 1)
-        }
-      }
+      const availableCustomizationOptions = parseCheckedOptions(
+        row,
+        PRODUCT_COL.CUSTOMIZATION_OPTIONS_START,
+        PRODUCT_COL.CUSTOMIZATION_OPTIONS_COUNT
+      )
       
       const id = name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')
       
