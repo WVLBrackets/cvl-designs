@@ -84,7 +84,7 @@ export function generateCustomerEmail(data: CustomerEmailData): string {
       <tr style="border-bottom: 1px solid #e5e7eb;">
         <td style="padding: 15px 10px;">
           <div style="font-weight: 600; color: #111827; margin-bottom: 5px;">
-            ${item.productName} (${item.size})
+            ${item.productName} (${[item.color, item.size].filter(Boolean).join(' / ')})
           </div>
           ${designOptions || customOptions ? `
             <ul style="margin: 5px 0 0 0; padding-left: 20px; list-style-type: disc;">
@@ -265,7 +265,7 @@ export function generateAdminEmail(data: AdminEmailData): string {
     return `
       <tr style="border-bottom: 1px solid #e5e7eb;">
         <td style="padding: 10px; font-size: 14px;">
-          <strong>${item.productName}</strong> (${item.size})<br>
+          <strong>${item.productName}</strong> (${[item.color, item.size].filter(Boolean).join(' / ')})<br>
           ${details.length > 0 ? `<span style="font-size: 12px; color: #6b7280;">${details.join(', ')}</span>` : ''}
         </td>
         <td style="padding: 10px; text-align: center; font-size: 14px;">${item.quantity}</td>

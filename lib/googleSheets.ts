@@ -12,7 +12,9 @@ import type {
   DesignOption, 
   CustomizationOption,
   Category,
-  SelectionMode 
+  SelectionMode,
+  ColorVariant,
+  SizeWithPrice,
 } from './types'
 /**
  * Fetch stores from Products sheet (tab: Stores)
@@ -105,6 +107,10 @@ const PRODUCT_COL = {
   CUSTOMIZATION_SELECTION_MODE: 31, // AF
   CUSTOMIZATION_OPTIONS_START: 32, // AG
   CUSTOMIZATION_OPTIONS_COUNT: 12, // AG–AP
+  COLOR_NAME: 42, // AQ
+  COLOR_HEX: 43, // AR
+  COLOR_UPCHARGE: 44, // AS
+  COLOR_DEFAULT: 45, // AT
 } as const
 
 const DESIGN_OPTION_COUNT = 12
@@ -392,6 +398,186 @@ export async function fetchCustomizationOptions(): Promise<CustomizationOption[]
 }
 
 /**
+ * Slugify text for product and color ids
+ */
+function slugify(text: string): string {
+  return text.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')
+}
+
+interface ParsedVariantRow {
+  name: string
+  displayName: string
+  status: ProductStatus
+  storeCell: string
+  price: number
+  category: string
+  image?: string
+  availableSizes: SizeWithPrice[]
+  sizingChart?: string
+  designRequired: boolean
+  designSelectionMode: SelectionMode
+  availableDesignOptions: number[]
+  customizationRequired: boolean
+  customizationSelectionMode: SelectionMode
+  availableCustomizationOptions: number[]
+  colorName?: string
+  colorHex?: string
+  colorUpcharge: number
+  colorDefault: boolean
+}
+
+/**
+ * Parse a single Products tab data row into a variant record
+ */
+function parseVariantRow(row: unknown[], sizeLabels: string[]): ParsedVariantRow | null {
+  if (!row[PRODUCT_COL.NAME]) return null
+
+  const name = String(row[PRODUCT_COL.NAME]).trim()
+  const displayName = row[PRODUCT_COL.DISPLAY_NAME]
+    ? String(row[PRODUCT_COL.DISPLAY_NAME]).trim()
+    : name
+  const statusValue = row[PRODUCT_COL.STATUS] ? String(row[PRODUCT_COL.STATUS]) : 'Public'
+  const status: ProductStatus =
+    statusValue.toLowerCase() === 'draft' ? 'PREVIEW' : 'PROD'
+
+  const colorNameRaw = row[PRODUCT_COL.COLOR_NAME]
+    ? String(row[PRODUCT_COL.COLOR_NAME]).trim()
+    : ''
+  const colorHexRaw = row[PRODUCT_COL.COLOR_HEX]
+    ? String(row[PRODUCT_COL.COLOR_HEX]).trim()
+    : ''
+
+  return {
+    name,
+    displayName,
+    status,
+    storeCell: row[PRODUCT_COL.STORE] ? String(row[PRODUCT_COL.STORE]) : '',
+    price: parseCurrency(row[PRODUCT_COL.PRICE]),
+    category: row[PRODUCT_COL.CATEGORY] ? String(row[PRODUCT_COL.CATEGORY]) : 'uncategorized',
+    image: row[PRODUCT_COL.IMAGE] ? String(row[PRODUCT_COL.IMAGE]).trim() : undefined,
+    availableSizes: parseAvailableSizes(row, sizeLabels),
+    sizingChart: row[PRODUCT_COL.SIZING_CHART]
+      ? String(row[PRODUCT_COL.SIZING_CHART]).trim()
+      : undefined,
+    designRequired: parseBooleanCell(row[PRODUCT_COL.DESIGN_REQUIRED]),
+    designSelectionMode: parseSelectionMode(row[PRODUCT_COL.DESIGN_SELECTION_MODE]),
+    availableDesignOptions: parseCheckedOptions(
+      row,
+      PRODUCT_COL.DESIGN_OPTIONS_START,
+      PRODUCT_COL.DESIGN_OPTIONS_COUNT
+    ),
+    customizationRequired: parseBooleanCell(row[PRODUCT_COL.CUSTOMIZATION_REQUIRED]),
+    customizationSelectionMode: parseSelectionMode(row[PRODUCT_COL.CUSTOMIZATION_SELECTION_MODE]),
+    availableCustomizationOptions: parseCheckedOptions(
+      row,
+      PRODUCT_COL.CUSTOMIZATION_OPTIONS_START,
+      PRODUCT_COL.CUSTOMIZATION_OPTIONS_COUNT
+    ),
+    colorName: colorNameRaw || undefined,
+    colorHex: colorHexRaw || undefined,
+    colorUpcharge: parseCurrency(row[PRODUCT_COL.COLOR_UPCHARGE]),
+    colorDefault: parseBooleanCell(row[PRODUCT_COL.COLOR_DEFAULT]),
+  }
+}
+
+/**
+ * Return true if shared product metadata matches across variant rows
+ */
+function sharedFieldsMatch(a: ParsedVariantRow, b: ParsedVariantRow): boolean {
+  return (
+    a.displayName === b.displayName &&
+    a.status === b.status &&
+    a.storeCell === b.storeCell &&
+    Math.abs(a.price - b.price) < 0.01 &&
+    a.category === b.category
+  )
+}
+
+/**
+ * Build a catalog Product from one or more grouped variant rows
+ */
+function buildProductFromVariantGroup(
+  groupKey: string,
+  variants: ParsedVariantRow[]
+): Product | null {
+  if (variants.length === 0) return null
+
+  for (let i = 1; i < variants.length; i++) {
+    if (!sharedFieldsMatch(variants[0], variants[i])) {
+      console.warn(
+        `[fetchProducts] Skipping group "${groupKey}": inconsistent shared fields between variant rows`
+      )
+      return null
+    }
+  }
+
+  const base = variants[0]
+  const id = slugify(groupKey)
+  const colorRows = variants.filter(v => v.colorName)
+
+  if (colorRows.length === 0) {
+    return {
+      id,
+      name: groupKey,
+      displayName: base.displayName,
+      category: base.category,
+      price: base.price,
+      status: base.status,
+      image: base.image,
+      availableSizes: base.availableSizes,
+      availableColors: [],
+      sizingChart: base.sizingChart,
+      availableDesignOptions: base.availableDesignOptions,
+      designRequired: base.designRequired,
+      designSelectionMode: base.designSelectionMode,
+      availableCustomizationOptions: base.availableCustomizationOptions,
+      customizationRequired: base.customizationRequired,
+      customizationSelectionMode: base.customizationSelectionMode,
+    }
+  }
+
+  const availableColors: ColorVariant[] = colorRows.map(variant => ({
+    id: slugify(`${groupKey}-${variant.colorName}`),
+    name: variant.colorName!,
+    hexCode: variant.colorHex,
+    upcharge: variant.colorUpcharge,
+    isDefault: variant.colorDefault,
+    image: variant.image,
+    availableSizes: variant.availableSizes,
+  }))
+
+  let defaultColor =
+    availableColors.find(c => c.isDefault) || availableColors[0]
+  if (!availableColors.some(c => c.isDefault) && availableColors.length > 0) {
+    defaultColor = { ...availableColors[0], isDefault: true }
+    availableColors[0] = defaultColor
+  }
+
+  const metadataRow =
+    variants.find(v => v.colorDefault && v.colorName) || colorRows[0]
+
+  return {
+    id,
+    name: groupKey,
+    displayName: base.displayName,
+    category: base.category,
+    price: base.price,
+    status: base.status,
+    image: defaultColor.image || metadataRow.image,
+    availableSizes: defaultColor.availableSizes,
+    availableColors,
+    defaultColorId: defaultColor.id,
+    sizingChart: metadataRow.sizingChart || base.sizingChart,
+    availableDesignOptions: metadataRow.availableDesignOptions,
+    designRequired: metadataRow.designRequired,
+    designSelectionMode: metadataRow.designSelectionMode,
+    availableCustomizationOptions: metadataRow.availableCustomizationOptions,
+    customizationRequired: metadataRow.customizationRequired,
+    customizationSelectionMode: metadataRow.customizationSelectionMode,
+  }
+}
+
+/**
  * Fetch products from Google Sheets with environment-based filtering
  */
 export async function fetchProducts(storeSlug?: string): Promise<Product[]> {
@@ -399,10 +585,9 @@ export async function fetchProducts(storeSlug?: string): Promise<Product[]> {
     const sheets = await getSheetsClient()
     const spreadsheetId = getSheetId('products')
     
-    // Row 3 = headers (size labels), row 4+ = product data
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId,
-      range: 'Products!A3:AP100',
+      range: 'Products!A3:AT100',
     })
     
     const rows = response.data.values || []
@@ -412,25 +597,18 @@ export async function fetchProducts(storeSlug?: string): Promise<Product[]> {
     const sizeLabels = parseSizeLabelsFromHeader(headerRow)
     const dataRows = rows.slice(1)
     const environment = getEnvironment()
-    const products: Product[] = []
+    const variantGroups = new Map<string, ParsedVariantRow[]>()
     
     dataRows.forEach(row => {
-      if (!row[PRODUCT_COL.NAME]) return // Skip empty rows
-      
-      const name = String(row[PRODUCT_COL.NAME])
-      const displayName = row[PRODUCT_COL.DISPLAY_NAME] ? String(row[PRODUCT_COL.DISPLAY_NAME]) : name
-      const statusValue = row[PRODUCT_COL.STATUS] ? String(row[PRODUCT_COL.STATUS]) : 'Public'
-      const storeCell = row[PRODUCT_COL.STORE] ? String(row[PRODUCT_COL.STORE]) : ''
-      const status: ProductStatus = statusValue.toLowerCase() === 'draft' ? 'PREVIEW' : 'PROD'
-      
-      // Filter based on environment
-      if (status === 'PREVIEW' && environment === 'production') {
+      const parsed = parseVariantRow(row, sizeLabels)
+      if (!parsed) return
+
+      if (parsed.status === 'PREVIEW' && environment === 'production') {
         return
       }
 
-      // Store filtering
       if (storeSlug) {
-        const tokens = storeCell
+        const tokens = parsed.storeCell
           .split(/[,\n]/)
           .map(t => t.trim().toLowerCase())
           .filter(Boolean)
@@ -438,60 +616,23 @@ export async function fetchProducts(storeSlug?: string): Promise<Product[]> {
         const allowed = hasAll || tokens.includes(storeSlug.toLowerCase())
         if (!allowed) return
       } else {
-        // No store specified: show only 'all' products by default
-        const tokens = storeCell
+        const tokens = parsed.storeCell
           .split(/[,\n]/)
           .map(t => t.trim().toLowerCase())
           .filter(Boolean)
         if (tokens.length > 0 && !tokens.includes('all')) return
       }
-      
-      const price = parseCurrency(row[PRODUCT_COL.PRICE])
-      const category = row[PRODUCT_COL.CATEGORY] ? String(row[PRODUCT_COL.CATEGORY]) : 'uncategorized'
-      const image = row[PRODUCT_COL.IMAGE] ? String(row[PRODUCT_COL.IMAGE]) : undefined
-      
-      const availableSizes = parseAvailableSizes(row, sizeLabels)
-      
-      const sizingChart = row[PRODUCT_COL.SIZING_CHART]
-        ? String(row[PRODUCT_COL.SIZING_CHART]).trim()
-        : undefined
-      const designRequired = parseBooleanCell(row[PRODUCT_COL.DESIGN_REQUIRED])
-      const designSelectionMode = parseSelectionMode(row[PRODUCT_COL.DESIGN_SELECTION_MODE])
-      
-      const availableDesignOptions = parseCheckedOptions(
-        row,
-        PRODUCT_COL.DESIGN_OPTIONS_START,
-        PRODUCT_COL.DESIGN_OPTIONS_COUNT
-      )
-      
-      const customizationRequired = parseBooleanCell(row[PRODUCT_COL.CUSTOMIZATION_REQUIRED])
-      const customizationSelectionMode = parseSelectionMode(row[PRODUCT_COL.CUSTOMIZATION_SELECTION_MODE])
-      
-      const availableCustomizationOptions = parseCheckedOptions(
-        row,
-        PRODUCT_COL.CUSTOMIZATION_OPTIONS_START,
-        PRODUCT_COL.CUSTOMIZATION_OPTIONS_COUNT
-      )
-      
-      const id = name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')
-      
-      products.push({
-        id,
-        name,
-        displayName,
-        category,
-        price,
-        status,
-        image,
-        availableSizes,
-        sizingChart,
-        availableDesignOptions,
-        designRequired,
-        designSelectionMode,
-        availableCustomizationOptions,
-        customizationRequired,
-        customizationSelectionMode,
-      })
+
+      const groupKey = parsed.name
+      const existing = variantGroups.get(groupKey) || []
+      existing.push(parsed)
+      variantGroups.set(groupKey, existing)
+    })
+
+    const products: Product[] = []
+    variantGroups.forEach((variants, groupKey) => {
+      const product = buildProductFromVariantGroup(groupKey, variants)
+      if (product) products.push(product)
     })
     
     return products
@@ -527,6 +668,7 @@ export interface ProductCatalogDiagnostics {
   rows: ProductCatalogDiagnosticRow[]
   fetchedProductCount: number
   visibleProductCount: number
+  multiColorProductCount: number
   orphanedProducts: Array<{ name: string; category: string }>
 }
 
@@ -547,7 +689,7 @@ export async function diagnoseProductCatalog(
   const spreadsheetId = getSheetId('products')
   const response = await sheets.spreadsheets.values.get({
     spreadsheetId,
-    range: 'Products!A3:AP100',
+    range: 'Products!A3:AT100',
   })
 
   const rows = response.data.values || []
@@ -558,6 +700,10 @@ export async function diagnoseProductCatalog(
     const rowNumber = index + 4
     const name = row[PRODUCT_COL.NAME] ? String(row[PRODUCT_COL.NAME]).trim() : ''
     if (!name) return
+
+    const colorName = row[PRODUCT_COL.COLOR_NAME]
+      ? String(row[PRODUCT_COL.COLOR_NAME]).trim()
+      : ''
 
     const statusRaw = row[PRODUCT_COL.STATUS] ? String(row[PRODUCT_COL.STATUS]) : '(empty → Public)'
     const statusResolved: ProductStatus =
@@ -611,7 +757,7 @@ export async function diagnoseProductCatalog(
 
     diagnosticRows.push({
       rowNumber,
-      name,
+      name: colorName ? `${name} (${colorName})` : name,
       statusRaw,
       statusResolved,
       storeRaw,
@@ -640,6 +786,7 @@ export async function diagnoseProductCatalog(
     rows: diagnosticRows,
     fetchedProductCount: fetchedProducts.length,
     visibleProductCount: fetchedProducts.filter(p => categoryIds.has(p.category)).length,
+    multiColorProductCount: fetchedProducts.filter(p => p.availableColors.length > 1).length,
     orphanedProducts,
   }
 }
@@ -697,6 +844,7 @@ export async function submitOrder(order: Order): Promise<{ success: boolean; err
           order.contactInfo.parentLastName,
           order.contactInfo.phoneNumber,
           item.productName,
+          item.color || '',
           item.size,
           1, // Always 1 since we're repeating rows
           item.itemPrice,
@@ -719,7 +867,7 @@ export async function submitOrder(order: Order): Promise<{ success: boolean; err
     try {
       const appendPromise = sheets.spreadsheets.values.append({
         spreadsheetId,
-        range: 'A2:T2',
+        range: 'A2:U2',
         valueInputOption: 'RAW',
         requestBody: {
           values: rows,

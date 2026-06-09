@@ -19,12 +19,19 @@ import type {
 
 import CustomerInfoForm, { isContactInfoValid } from '../CustomerInfoForm'
 import ProductSelector from './ProductSelector'
+import ColorSelector from './ColorSelector'
 import SizeSelector from './SizeSelector'
 import DesignOptionsSelector from './DesignOptionsSelector'
 import CustomizationOptionsSelector from './CustomizationOptionsSelector'
 import OrderSummary from './OrderSummary'
 import PaymentOptions from '../PaymentOptions'
 import SubmitConfirmationModal from './SubmitConfirmationModal'
+import {
+  findColorVariant,
+  getActiveSizes,
+  getDefaultColorVariant,
+  productHasColorChoice,
+} from '@/lib/productColors'
 
 interface NewOrderFormProps {
   products: Product[]
@@ -63,11 +70,49 @@ interface NewOrderFormProps {
 
 interface CurrentItemState {
   product: Product | null
+  colorId: string
+  colorName: string
+  colorUpcharge: number
   size: string
-  sizeUpcharge: number // Additional cost for selected size (e.g., +$2 for 2XL)
+  sizeUpcharge: number
   selectedDesignOptions: number[]
   selectedCustomizationOptions: number[]
   customizationData: { optionNumber: number; customName?: string; customNumber?: string }[]
+}
+
+/**
+ * Empty state for the in-progress order line item
+ */
+function createEmptyCurrentItem(): CurrentItemState {
+  return {
+    product: null,
+    colorId: '',
+    colorName: '',
+    colorUpcharge: 0,
+    size: '',
+    sizeUpcharge: 0,
+    selectedDesignOptions: [],
+    selectedCustomizationOptions: [],
+    customizationData: [],
+  }
+}
+
+/**
+ * Initialize current item when a catalog product is selected
+ */
+function createCurrentItemForProduct(product: Product): CurrentItemState {
+  const defaultColor = getDefaultColorVariant(product)
+  return {
+    product,
+    colorId: defaultColor?.id || '',
+    colorName: defaultColor?.name || '',
+    colorUpcharge: defaultColor?.upcharge || 0,
+    size: '',
+    sizeUpcharge: 0,
+    selectedDesignOptions: [],
+    selectedCustomizationOptions: [],
+    customizationData: [],
+  }
 }
 
 type FormStep = 'customer' | 'adding-item' | 'review'
@@ -121,14 +166,7 @@ export default function NewOrderForm({
   const [orderItems, setOrderItems] = useState<OrderItem[]>([])
   
   // Current Item Being Configured
-  const [currentItem, setCurrentItem] = useState<CurrentItemState>({
-    product: null,
-    size: '',
-    sizeUpcharge: 0,
-    selectedDesignOptions: [],
-    selectedCustomizationOptions: [],
-    customizationData: [],
-  })
+  const [currentItem, setCurrentItem] = useState<CurrentItemState>(createEmptyCurrentItem())
   
   // UI State - always initialize with 'customer'
   const [step, setStep] = useState<FormStep>('customer')
@@ -203,15 +241,7 @@ export default function NewOrderForm({
       
       // If we're in product detail mode (product selected), go back to catalog
       if (currentItem.product) {
-        setCurrentItem({
-          product: null,
-          size: '',
-          sizeUpcharge: 0,
-          selectedDesignOptions: [],
-          selectedCustomizationOptions: [],
-          customizationData: [],
-        })
-        // Push a new state so next back goes to storefront
+        setCurrentItem(createEmptyCurrentItem())
         window.history.pushState({ view: 'catalog' }, '')
         return
       }
@@ -266,9 +296,17 @@ export default function NewOrderForm({
    */
   const isCurrentItemValid = () => {
     if (!currentItem.product) return false
-    
-    // Check size selection
-    if (currentItem.product.availableSizes.length > 0 && !currentItem.size) {
+
+    if (productHasColorChoice(currentItem.product) && !currentItem.colorId) {
+      return false
+    }
+
+    const activeSizes = getActiveSizes(
+      currentItem.product,
+      currentItem.colorId,
+      currentItem.colorName
+    )
+    if (activeSizes.length > 0 && !currentItem.size) {
       return false
     }
     
@@ -429,15 +467,17 @@ export default function NewOrderForm({
     )
     const customizationOptionsTotal = selectedCustom.reduce((sum, opt) => sum + opt.price, 0)
     
-    // Calculate item price (base price + size upcharge, combined per Option A)
-    const itemPrice = currentItem.product.price + currentItem.sizeUpcharge
-    
+    const itemPrice =
+      currentItem.product.price + currentItem.colorUpcharge + currentItem.sizeUpcharge
+
     const newItem: OrderItem = {
       productId: currentItem.product.id,
       productName: currentItem.product.name,
+      color: currentItem.colorName || undefined,
+      colorUpcharge: currentItem.colorUpcharge,
       size: currentItem.size || 'N/A',
       sizeUpcharge: currentItem.sizeUpcharge,
-      itemPrice: itemPrice, // Combined: base price + size upcharge
+      itemPrice,
       quantity: 1,
       designOptions: selectedDesign,
       designOptionsTotal,
@@ -458,14 +498,7 @@ export default function NewOrderForm({
     }
     
     // Reset current item
-    setCurrentItem({
-      product: null,
-      size: '',
-      sizeUpcharge: 0,
-      selectedDesignOptions: [],
-      selectedCustomizationOptions: [],
-      customizationData: [],
-    })
+    setCurrentItem(createEmptyCurrentItem())
     
     setStep('review')
   }
@@ -495,8 +528,13 @@ export default function NewOrderForm({
     }
     
     // Load item data into current item state
+    const variant = findColorVariant(product, undefined, item.color)
+
     setCurrentItem({
       product,
+      colorId: variant?.id || product.defaultColorId || '',
+      colorName: item.color || variant?.name || '',
+      colorUpcharge: item.colorUpcharge || variant?.upcharge || 0,
       size: item.size,
       sizeUpcharge: item.sizeUpcharge || 0,
       selectedDesignOptions: item.designOptions?.map(opt => opt.optionNumber) || [],
@@ -560,14 +598,7 @@ export default function NewOrderForm({
    */
   const cancelEditing = () => {
     setEditingIndex(null)
-    setCurrentItem({
-      product: null,
-      size: '',
-      sizeUpcharge: 0,
-      selectedDesignOptions: [],
-      selectedCustomizationOptions: [],
-      customizationData: [],
-    })
+    setCurrentItem(createEmptyCurrentItem())
     setStep('review')
   }
   
@@ -721,14 +752,7 @@ export default function NewOrderForm({
             {/* Mobile: Small button in right corner */}
             {currentItem.product && (
               <button
-                onClick={() => setCurrentItem({
-                  product: null,
-                  size: '',
-                  sizeUpcharge: 0,
-                  selectedDesignOptions: [],
-                  selectedCustomizationOptions: [],
-                  customizationData: [],
-                })}
+                onClick={() => setCurrentItem(createEmptyCurrentItem())}
                 className="sm:hidden flex-shrink-0 px-2 py-1 text-xs bg-gray-100 text-gray-700 hover:bg-gray-200 rounded border border-gray-300"
               >
                 ← Back
@@ -737,14 +761,7 @@ export default function NewOrderForm({
             {/* Desktop: Original underline link */}
             {currentItem.product && (
               <button
-                onClick={() => setCurrentItem({
-                  product: null,
-                  size: '',
-                  sizeUpcharge: 0,
-                  selectedDesignOptions: [],
-                  selectedCustomizationOptions: [],
-                  customizationData: [],
-                })}
+                onClick={() => setCurrentItem(createEmptyCurrentItem())}
                 className="hidden sm:block flex-shrink-0 text-sm text-gray-700 hover:text-gray-900 underline"
               >
                 Back to products
@@ -758,8 +775,9 @@ export default function NewOrderForm({
               products={products}
               categories={categories}
               selectedProduct={currentItem.product}
+              selectedColorId={currentItem.colorId}
               onSelect={(product) => {
-                setCurrentItem({ ...currentItem, product, size: '', sizeUpcharge: 0, selectedDesignOptions: [], selectedCustomizationOptions: [], customizationData: [] })
+                setCurrentItem(createCurrentItemForProduct(product))
                 // Push history state so browser back returns to catalog
                 pushProductDetailHistory()
                 // Scroll to catalog anchor (after customer info, before product section)
@@ -778,16 +796,41 @@ export default function NewOrderForm({
             />
           </div>
           
-          {/* Step 2: Select Size */}
+          {/* Step 2: Select Color */}
+          {currentItem.product && (
+            <ColorSelector
+              product={currentItem.product}
+              selectedColorId={currentItem.colorId}
+              onSelect={(colorId, colorName, upcharge) => {
+                const activeSizes = getActiveSizes(currentItem.product!, colorId)
+                const sizeStillValid = activeSizes.some(s => s.size === currentItem.size)
+                setCurrentItem({
+                  ...currentItem,
+                  colorId,
+                  colorName,
+                  colorUpcharge: upcharge,
+                  size: sizeStillValid ? currentItem.size : '',
+                  sizeUpcharge: sizeStillValid ? currentItem.sizeUpcharge : 0,
+                })
+              }}
+            />
+          )}
+
+          {/* Step 3: Select Size */}
           {currentItem.product && (
             <SizeSelector
               product={currentItem.product}
+              availableSizes={getActiveSizes(
+                currentItem.product,
+                currentItem.colorId,
+                currentItem.colorName
+              )}
               selectedSize={currentItem.size}
               onSelect={(size, upcharge) => setCurrentItem({ ...currentItem, size, sizeUpcharge: upcharge })}
             />
           )}
           
-          {/* Step 3: Select Design Options */}
+          {/* Step 4: Select Design Options */}
           {currentItem.product && (
             <DesignOptionsSelector
               product={currentItem.product}
@@ -801,7 +844,7 @@ export default function NewOrderForm({
             />
           )}
           
-          {/* Step 4: Select Customization Options */}
+          {/* Step 5: Select Customization Options */}
           {currentItem.product && (
             <CustomizationOptionsSelector
               product={currentItem.product}
@@ -821,14 +864,7 @@ export default function NewOrderForm({
           <div className="flex gap-3 justify-end pt-4 border-t">
             <button
               onClick={editingIndex !== null ? cancelEditing : () => {
-                setCurrentItem({
-                  product: null,
-                  size: '',
-                  sizeUpcharge: 0,
-                  selectedDesignOptions: [],
-                  selectedCustomizationOptions: [],
-                  customizationData: [],
-                })
+                setCurrentItem(createEmptyCurrentItem())
                 setStep('review')
               }}
               className="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 font-medium"

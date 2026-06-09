@@ -62,6 +62,11 @@ export default function OrderSummary({
   }
   
   const totalAmount = items.reduce((sum, item) => sum + (item.totalPrice * item.quantity), 0)
+
+  const formatVariantLabel = (item: OrderItem) => {
+    const parts = [item.color, item.size].filter(Boolean)
+    return parts.length > 0 ? parts.join(' / ') : 'N/A'
+  }
   
   return (
     <div 
@@ -81,7 +86,7 @@ export default function OrderSummary({
           <div className="sm:hidden space-y-2">
             {/* Row 1: Product Name and Size */}
             <div className="font-semibold text-gray-900">
-              {item.productName} <span className="text-sm text-gray-600">({item.size})</span>
+              {item.productName} <span className="text-sm text-gray-600">({formatVariantLabel(item)})</span>
             </div>
             
             {/* Row 2: Quantity Controls and Action Buttons */}
@@ -176,7 +181,7 @@ export default function OrderSummary({
             {/* Product Name and Size - Aligned with button top */}
             <div className="flex-1 min-w-0 pt-0.5">
               <span className="font-semibold text-gray-900">{item.productName}</span>
-              <span className="text-sm text-gray-600 ml-2">({item.size})</span>
+              <span className="text-sm text-gray-600 ml-2">({formatVariantLabel(item)})</span>
             </div>
 
             {/* Quantity Controls with Label */}
@@ -246,9 +251,14 @@ export default function OrderSummary({
               {isExpanded && (
                 <div className="mt-3 pl-8 space-y-2 text-sm border-t pt-3">
                   <div className="flex justify-between text-gray-700">
-                    <span>Item Price ({item.size}):</span>
+                    <span>Item Price ({formatVariantLabel(item)}):</span>
                     <span>${item.itemPrice.toFixed(2)}</span>
                   </div>
+                  {item.colorUpcharge != null && item.colorUpcharge > 0 && (
+                    <div className="flex justify-between text-xs text-gray-500 pl-4">
+                      <span>(includes +${item.colorUpcharge.toFixed(2)} color upcharge)</span>
+                    </div>
+                  )}
                   {/* Show size upcharge breakdown if applicable */}
                   {item.sizeUpcharge > 0 && (
                     <div className="text-xs text-gray-500 -mt-1">

@@ -49,6 +49,7 @@ function generateInvoiceHTML_V1(order: Order, config: any): string {
     <tr>
       <td style="padding: 12px; border-bottom: 1px solid #e5e7eb;">
         <strong>${item.productName}</strong><br/>
+        ${item.color ? `<span style="font-size: 0.875rem; color: #6b7280;">Color: ${item.color}</span><br/>` : ''}
         <span style="font-size: 0.875rem; color: #6b7280;">Size: ${item.size}</span>
       </td>
       <td style="padding: 12px; border-bottom: 1px solid #e5e7eb;">
@@ -163,6 +164,7 @@ function generateInvoiceHTML_V2(order: Order, config: any): string {
       <div style="display: flex; justify-content: space-between; align-items: start;">
         <div>
           <h4 style="margin: 0 0 5px 0; color: #1f2937;">${item.productName}</h4>
+          ${item.color ? `<p style="margin: 3px 0; font-size: 0.875rem; color: #6b7280;">Color: ${item.color}</p>` : ''}
           <p style="margin: 3px 0; font-size: 0.875rem; color: #6b7280;">Size: ${item.size}</p>
           ${item.designOptions.length > 0 ? `<p style="margin: 3px 0; font-size: 0.875rem; color: #6b7280;">Design: ${item.designOptions.map(opt => opt.title).join(', ')}</p>` : ''}
           ${
@@ -262,7 +264,7 @@ function generateInvoiceHTML_V3(order: Order, config: any): string {
     <tr style="border-bottom: 2px solid #e5e7eb;">
       <td style="padding: 15px;">
         <div style="font-weight: 700; font-size: 1.125rem; color: #1f2937;">${item.productName}</div>
-        <div style="font-size: 0.875rem; color: #6b7280; margin-top: 5px;">Size: ${item.size}</div>
+        <div style="font-size: 0.875rem; color: #6b7280; margin-top: 5px;">${item.color ? `Color: ${item.color}<br/>` : ''}Size: ${item.size}</div>
       </td>
       <td style="padding: 15px; font-size: 0.875rem; color: #6b7280;">
         ${item.designOptions.length > 0 ? item.designOptions.map(opt => opt.title).join('<br/>') : '—'}

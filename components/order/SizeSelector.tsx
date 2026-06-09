@@ -11,12 +11,14 @@ import Image from 'next/image'
 
 interface SizeSelectorProps {
   product: Product
+  availableSizes: SizeWithPrice[]
   selectedSize: string
-  onSelect: (size: string, upcharge: number) => void // Updated to include upcharge
+  onSelect: (size: string, upcharge: number) => void
 }
 
 export default function SizeSelector({
   product,
+  availableSizes,
   selectedSize,
   onSelect,
 }: SizeSelectorProps) {
@@ -25,7 +27,7 @@ export default function SizeSelector({
   // Check if sizing chart is a PDF
   const isPDF = product.sizingChart?.toLowerCase().endsWith('.pdf') || false
   
-  if (product.availableSizes.length === 0) {
+  if (availableSizes.length === 0) {
     return (
       <div className="text-gray-500 text-sm">
         No size selection required for this product
@@ -53,7 +55,7 @@ export default function SizeSelector({
         </div>
       
       <div className="flex flex-wrap gap-2">
-        {product.availableSizes.map((sizeOption) => {
+        {availableSizes.map((sizeOption) => {
           const isSelected = selectedSize === sizeOption.size
           const isTBD = sizeOption.size === 'TBD'
           const hasUpcharge = sizeOption.upcharge > 0

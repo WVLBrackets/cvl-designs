@@ -5,6 +5,7 @@
 'use client'
 
 import type { Product, Category } from '@/lib/types'
+import { getProductDisplayImage } from '@/lib/productColors'
 import ProductImage from '../ProductImage'
 import ProductImageWithZoom from '../ProductImageWithZoom'
 
@@ -12,6 +13,7 @@ interface ProductSelectorProps {
   products: Product[]
   categories: Category[]
   selectedProduct: Product | null
+  selectedColorId?: string
   onSelect: (product: Product) => void
   detailMode?: boolean
 }
@@ -20,6 +22,7 @@ export default function ProductSelector({
   products,
   categories,
   selectedProduct,
+  selectedColorId,
   onSelect,
   detailMode,
 }: ProductSelectorProps) {
@@ -34,6 +37,7 @@ export default function ProductSelector({
   if (isDetail && selectedProduct) {
     const product = selectedProduct
     const displayPrice = `${product.name} ($${product.price})`
+    const imageSrc = getProductDisplayImage(product, selectedColorId)
     return (
       <div className="space-y-4 -mt-2">
         <div className="grid gap-3">
@@ -41,7 +45,7 @@ export default function ProductSelector({
             {/* Mobile: Stacked layout with larger centered image (non-zoomable) */}
             <div className="sm:hidden flex flex-col items-center gap-3 text-center">
               <ProductImage
-                src={product.image}
+                src={imageSrc}
                 alt={product.name}
                 type="item"
                 width={180}
@@ -59,7 +63,7 @@ export default function ProductSelector({
             {/* Desktop: Original horizontal layout with zoom */}
             <div className="hidden sm:flex items-center gap-3">
               <ProductImageWithZoom
-                src={product.image}
+                src={imageSrc}
                 alt={product.name}
                 type="item"
                 width={120}
@@ -90,6 +94,7 @@ export default function ProductSelector({
             <h4 className="text-md font-medium text-gray-700 capitalize">{category.name}</h4>
             <div className={`grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3`}>
               {categoryProducts.map(product => {
+                const catalogImage = getProductDisplayImage(product)
                 return (
                   <button
                     key={product.id}
@@ -98,7 +103,7 @@ export default function ProductSelector({
                   >
                     <div className="flex gap-3">
                       <ProductImageWithZoom
-                        src={product.image}
+                        src={catalogImage}
                         alt={product.name}
                         type="item"
                         width={60}

@@ -138,21 +138,33 @@ Example:
 
 ### Products Sheet - Products Tab
 
-Should have these columns (starting at row 4):
-- A: Product Name
-- B: Display Name format
+Row 3 contains column headers (size labels in H–Q). Data starts at row 4.
+
+**Core columns:**
+- A: Product Name (group key — identical across color variant rows)
+- B: Display Name
 - C: Status (Public/Draft)
-- D: Base Price
-- E: Category
-- F: Image filename
-- G-N: Size checkboxes
-- O: Sizing Chart filename
-- P: Design Required (True/False)
-- Q: Design Selection Mode (Single/Multi/None)
-- R-AA: Design Options checkboxes (1-10)
-- AB: Customization Required (True/False)
-- AC: Customization Selection Mode (Single/Multi/None)
-- AD-AM: Customization Options checkboxes (1-10)
+- D: Store slug(s)
+- E: Base Price
+- F: Category
+- G: Image filename (per color variant)
+- H–Q: Size availability/upcharge (per color variant; labels from row 3)
+- R: Sizing Chart filename
+- S–AP: Design and customization options (same as before)
+
+**Color variant columns (AQ–AT):**
+- AQ: Color Name (required for multi-color products; leave blank for single-SKU rows)
+- AR: Color Hex (optional, e.g. `#1a1a1a` for swatch UI)
+- AS: Color Upcharge (optional, default `0`)
+- AT: Color Default (`TRUE` on exactly one row per product group)
+
+**Multi-color products:** Create one row per color with the same column A name. Vary columns G, H–Q, and AQ–AS per row. The storefront groups rows into one catalog product with a color picker.
+
+**Single-color products:** One row with blank Color Name — behaves like today (no color step).
+
+### Staging Products Sheet
+
+For schema experiments, copy the Products workbook and set `GOOGLE_SHEET_PRODUCTS_STAGING_ID` in Vercel Preview and local `.env`. Production uses `GOOGLE_SHEET_PRODUCTS_ID` only.
 
 ### Products Sheet - Reference Data Tab
 

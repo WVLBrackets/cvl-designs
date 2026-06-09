@@ -204,7 +204,7 @@ async function generateMinimalTemplate(filepath: string, data: InvoiceData): Pro
 
     data.items.forEach((item) => {
       const itemTotal = item.totalPrice * item.quantity
-      doc.fontSize(10).text(`${item.productName} (${item.size})`, { continued: true })
+      doc.fontSize(10).text(`${item.productName} (${[item.color, item.size].filter(Boolean).join(' / ')})`, { continued: true })
       doc.text(`$${itemTotal.toFixed(2)}`, { align: 'right' })
       
       if (item.quantity > 1) {
@@ -334,7 +334,7 @@ async function generateProfessionalTemplateBuffer(data: InvoiceData): Promise<Bu
       
       // Product name and total
       doc.fontSize(10).fillColor('#000000')
-      doc.text(`${item.productName} (${item.size})`, 60, currentY + topPadding, { width: 350, continued: false })
+      doc.text(`${item.productName} (${[item.color, item.size].filter(Boolean).join(' / ')})`, 60, currentY + topPadding, { width: 350, continued: false })
       doc.text(`$${itemTotal.toFixed(2)}`, 480, currentY + topPadding, { width: 55, align: 'right' })
       
       let textY = currentY + topPadding + 14 // Start below product name
@@ -498,7 +498,7 @@ async function generateProfessionalTemplate(filepath: string, data: InvoiceData)
       
       // Product name and total
       doc.fontSize(10).fillColor('#000000')
-      doc.text(`${item.productName} (${item.size})`, 60, currentY + topPadding, { width: 350, continued: false })
+      doc.text(`${item.productName} (${[item.color, item.size].filter(Boolean).join(' / ')})`, 60, currentY + topPadding, { width: 350, continued: false })
       doc.text(`$${itemTotal.toFixed(2)}`, 480, currentY + topPadding, { width: 55, align: 'right' })
       
       let textY = currentY + topPadding + 14 // Start below product name
@@ -610,6 +610,10 @@ async function generateDetailedTemplate(filepath: string, data: InvoiceData): Pr
       // Item details
       doc.fontSize(10)
       doc.text(`Size: ${item.size}`, 70, currentY)
+      if (item.color) {
+        currentY += 12
+        doc.text(`Color: ${item.color}`, 70, currentY)
+      }
       doc.text(`Quantity: ${item.quantity}`, 250, currentY)
       doc.text(`Unit Price: $${item.totalPrice.toFixed(2)}`, 380, currentY)
       currentY += 20

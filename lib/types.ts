@@ -45,6 +45,19 @@ export interface CustomizationOption {
 }
 
 /**
+ * Color variant for a product (one sheet row per variant when multi-color)
+ */
+export interface ColorVariant {
+  id: string
+  name: string
+  hexCode?: string
+  upcharge: number
+  isDefault: boolean
+  image?: string
+  availableSizes: SizeWithPrice[]
+}
+
+/**
  * Product from Google Sheets
  */
 export interface Product {
@@ -55,7 +68,9 @@ export interface Product {
   price: number
   status: ProductStatus
   image?: string
-  availableSizes: SizeWithPrice[] // Updated: now includes upcharge info
+  availableSizes: SizeWithPrice[]
+  availableColors: ColorVariant[]
+  defaultColorId?: string
   sizingChart?: string
   
   // Design Options
@@ -123,9 +138,11 @@ export interface SelectedCustomizationOption {
 export interface OrderItem {
   productId: string
   productName: string
+  color?: string
+  colorUpcharge?: number
   size: string
   sizeUpcharge: number // Size-based upcharge (e.g., +$2 for 2XL)
-  itemPrice: number // Base price + size upcharge (combined)
+  itemPrice: number // Base price + color + size upcharges (combined)
   quantity: number
   
   // Design options selected

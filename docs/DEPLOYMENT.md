@@ -96,7 +96,8 @@ If you want a separate development deployment:
 | `GOOGLE_SERVICE_ACCOUNT_EMAIL` | Service account email | Same for both | Same for both |
 | `GOOGLE_PRIVATE_KEY` | Service account private key | Same for both | Same for both |
 | `GOOGLE_SHEET_CONFIG_ID` | Config sheet ID | Same for both | Same for both |
-| `GOOGLE_SHEET_PRODUCTS_ID` | Products sheet ID | Same for both | Same for both |
+| `GOOGLE_SHEET_PRODUCTS_ID` | Products sheet ID (production) | Production deploys | Preview falls back if staging unset |
+| `GOOGLE_SHEET_PRODUCTS_STAGING_ID` | Products sheet ID (preview/local) | Optional on prod | Staging catalog for color-variant experiments |
 | `GOOGLE_SHEET_ORDERS_DEV_ID` | Dev orders sheet ID | Same for both | Same for both |
 | `GOOGLE_SHEET_ORDERS_PROD_ID` | Prod orders sheet ID | Same for both | Same for both |
 

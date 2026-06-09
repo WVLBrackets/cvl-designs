@@ -92,7 +92,13 @@ export async function POST(request: NextRequest) {
     
     const priceVerification = verifyPrices(
       validatedData.items,
-      products.map(p => ({ id: p.id, price: p.price, name: p.name, availableSizes: p.availableSizes })),
+      products.map(p => ({
+        id: p.id,
+        price: p.price,
+        name: p.name,
+        availableSizes: p.availableSizes,
+        availableColors: p.availableColors,
+      })),
       designOptions.map(d => ({ number: d.number, price: d.price })),
       customizationOptions.map(c => ({ number: c.number, price: c.price }))
     )
@@ -127,9 +133,21 @@ export async function POST(request: NextRequest) {
     const serverCalculatedTotal = validatedData.items.reduce((sum, item) => {
       const product = products.find(p => p.id === item.productId)
       if (!product) return sum
-      
-      // Get size upcharge from product's availableSizes
-      const sizeInfo = product.availableSizes.find(s => s.size === item.size)
+
+      let sizeList = product.availableSizes
+      let colorUpcharge = item.colorUpcharge || 0
+
+      if (item.color && product.availableColors.length > 0) {
+        const variant = product.availableColors.find(
+          c => c.name.toLowerCase() === item.color!.toLowerCase()
+        )
+        if (variant) {
+          sizeList = variant.availableSizes
+          colorUpcharge = variant.upcharge
+        }
+      }
+
+      const sizeInfo = sizeList.find(s => s.size === item.size)
       const sizeUpcharge = sizeInfo?.upcharge || 0
       
       const designTotal = item.designOptions.reduce((dSum, opt) => {
@@ -142,8 +160,7 @@ export async function POST(request: NextRequest) {
         return cSum + (cOpt?.price || 0)
       }, 0)
       
-      // Item price = base price + size upcharge
-      const itemTotal = (product.price + sizeUpcharge + designTotal + customTotal) * item.quantity
+      const itemTotal = (product.price + colorUpcharge + sizeUpcharge + designTotal + customTotal) * item.quantity
       return sum + itemTotal
     }, 0)
     

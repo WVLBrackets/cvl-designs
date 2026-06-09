@@ -97,6 +97,18 @@ export const orderItemSchema = z.object({
     .min(1, 'Product name is required')
     .max(200)
     .transform(sanitizeString),
+
+  color: z
+    .string()
+    .max(50)
+    .transform(sanitizeString)
+    .optional(),
+
+  colorUpcharge: z
+    .number()
+    .min(0, 'Color upcharge cannot be negative')
+    .max(100, 'Color upcharge is too high')
+    .default(0),
   
   size: z
     .string()
@@ -196,48 +208,79 @@ interface SizeInfo {
   upcharge: number
 }
 
+interface ColorVariantInfo {
+  id: string
+  name: string
+  upcharge: number
+  availableSizes: SizeInfo[]
+}
+
 /**
  * Verify that submitted prices match the product catalog
  * @param items - Order items to verify
- * @param products - Product catalog from Google Sheets (with size pricing)
+ * @param products - Product catalog from Google Sheets (with size/color pricing)
  * @param designOptions - Design options from reference data
  * @param customizationOptions - Customization options from reference data
  * @returns Object with success status and any price discrepancies found
  */
 export function verifyPrices(
   items: ValidatedOrderItem[],
-  products: Array<{ id: string; price: number; name: string; availableSizes?: SizeInfo[] }>,
+  products: Array<{
+    id: string
+    price: number
+    name: string
+    availableSizes?: SizeInfo[]
+    availableColors?: ColorVariantInfo[]
+  }>,
   designOptions: Array<{ number: number; price: number }>,
   customizationOptions: Array<{ number: number; price: number }>
 ): { valid: boolean; discrepancies: string[] } {
   const discrepancies: string[] = []
   
   for (const item of items) {
-    // Find the product
     const product = products.find(p => p.id === item.productId)
     
     if (!product) {
       discrepancies.push(`Product not found: ${item.productId}`)
       continue
     }
+
+    let sizeList = product.availableSizes || []
+    let expectedColorUpcharge = 0
+
+    if (item.color && product.availableColors && product.availableColors.length > 0) {
+      const variant = product.availableColors.find(
+        c => c.name.toLowerCase() === item.color!.toLowerCase()
+      )
+      if (!variant) {
+        discrepancies.push(`Color not found for ${product.name}: ${item.color}`)
+        continue
+      }
+      sizeList = variant.availableSizes
+      expectedColorUpcharge = variant.upcharge
+    }
+
+    const submittedColorUpcharge = item.colorUpcharge || 0
+    if (Math.abs(submittedColorUpcharge - expectedColorUpcharge) > 0.01) {
+      discrepancies.push(
+        `Color upcharge mismatch for ${product.name} (${item.color || 'default'}): submitted $${submittedColorUpcharge}, actual $${expectedColorUpcharge}`
+      )
+    }
     
-    // Find the size and its upcharge
-    const sizeInfo = product.availableSizes?.find(s => s.size === item.size)
+    const sizeInfo = sizeList.find(s => s.size === item.size)
     const expectedSizeUpcharge = sizeInfo?.upcharge || 0
     const submittedSizeUpcharge = item.sizeUpcharge || 0
     
-    // Verify size upcharge
     if (Math.abs(submittedSizeUpcharge - expectedSizeUpcharge) > 0.01) {
       discrepancies.push(
         `Size upcharge mismatch for ${product.name} (${item.size}): submitted $${submittedSizeUpcharge}, actual $${expectedSizeUpcharge}`
       )
     }
     
-    // Verify item price (base price + size upcharge)
-    const expectedItemPrice = product.price + expectedSizeUpcharge
+    const expectedItemPrice = product.price + expectedColorUpcharge + expectedSizeUpcharge
     if (Math.abs(item.itemPrice - expectedItemPrice) > 0.01) {
       discrepancies.push(
-        `Item price mismatch for ${product.name}: submitted $${item.itemPrice}, expected $${expectedItemPrice} (base $${product.price} + size $${expectedSizeUpcharge})`
+        `Item price mismatch for ${product.name}: submitted $${item.itemPrice}, expected $${expectedItemPrice} (base $${product.price} + color $${expectedColorUpcharge} + size $${expectedSizeUpcharge})`
       )
     }
     
