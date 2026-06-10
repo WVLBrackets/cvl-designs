@@ -10,6 +10,127 @@ import type { Order, OrderItem } from './types'
 
 export type InvoiceTemplate = 'minimal' | 'professional' | 'detailed'
 
+type PDFDoc = InstanceType<typeof PDFDocument>
+
+const ORDER_ITEM_PRODUCT_WIDTH = 350
+const ORDER_ITEM_OPTION_WIDTH = 470
+const ORDER_ITEM_LINE_HEIGHT = 13
+const ORDER_ITEM_TOP_PADDING = 5
+const ORDER_ITEM_BOTTOM_PADDING = 5
+const ORDER_ITEM_SUBLINE_GAP = 2
+
+/**
+ * Build the product line label shown on invoice rows
+ */
+function formatOrderItemLabel(item: OrderItem): string {
+  const variant = [item.color, item.size].filter(Boolean).join(' / ')
+  return variant ? `${item.productName} (${variant})` : item.productName
+}
+
+/**
+ * Measure wrapped product title height and total row height for PDF layout
+ */
+function measureOrderItemRow(
+  doc: PDFDoc,
+  item: OrderItem
+): { productNameHeight: number; rowHeight: number } {
+  const productLabel = formatOrderItemLabel(item)
+
+  doc.font('Helvetica').fontSize(10)
+  const productNameHeight = doc.heightOfString(productLabel, {
+    width: ORDER_ITEM_PRODUCT_WIDTH,
+  })
+
+  let sublinesHeight = 0
+  if (item.quantity > 1) {
+    sublinesHeight += ORDER_ITEM_LINE_HEIGHT
+  }
+  sublinesHeight +=
+    (item.designOptions.length + item.customizationOptions.length) *
+    ORDER_ITEM_LINE_HEIGHT
+
+  const hasSublines =
+    item.quantity > 1 ||
+    item.designOptions.length > 0 ||
+    item.customizationOptions.length > 0
+
+  const rowHeight =
+    ORDER_ITEM_TOP_PADDING +
+    productNameHeight +
+    (hasSublines ? ORDER_ITEM_SUBLINE_GAP : 0) +
+    sublinesHeight +
+    ORDER_ITEM_BOTTOM_PADDING
+
+  return { productNameHeight, rowHeight }
+}
+
+/**
+ * Draw one order item row in the professional invoice template
+ */
+function drawProfessionalOrderItem(
+  doc: PDFDoc,
+  item: OrderItem,
+  currentY: number,
+  index: number
+): number {
+  const itemTotal = item.totalPrice * item.quantity
+  const bgColor = index % 2 === 0 ? '#f3f4f6' : '#ffffff'
+  const productLabel = formatOrderItemLabel(item)
+  const { productNameHeight, rowHeight } = measureOrderItemRow(doc, item)
+
+  doc.rect(50, currentY, 495, rowHeight).fillAndStroke(bgColor, bgColor)
+
+  doc.font('Helvetica').fontSize(10).fillColor('#000000')
+  doc.text(productLabel, 60, currentY + ORDER_ITEM_TOP_PADDING, {
+    width: ORDER_ITEM_PRODUCT_WIDTH,
+  })
+  doc.text(
+    `$${itemTotal.toFixed(2)}`,
+    480,
+    currentY + ORDER_ITEM_TOP_PADDING,
+    { width: 55, align: 'right' }
+  )
+
+  const hasSublines =
+    item.quantity > 1 ||
+    item.designOptions.length > 0 ||
+    item.customizationOptions.length > 0
+
+  let textY =
+    currentY +
+    ORDER_ITEM_TOP_PADDING +
+    productNameHeight +
+    (hasSublines ? ORDER_ITEM_SUBLINE_GAP : 0)
+
+  if (item.quantity > 1) {
+    doc.fontSize(8).fillColor('#666666')
+    doc.text(
+      `Qty: ${item.quantity} × $${item.totalPrice.toFixed(2)}`,
+      60,
+      textY
+    )
+    textY += ORDER_ITEM_LINE_HEIGHT
+  }
+
+  doc.fontSize(8).fillColor('#666666')
+
+  item.designOptions.forEach(opt => {
+    const optText = `  • ${opt.title}${opt.price > 0 ? ` (+$${opt.price.toFixed(2)})` : ''}`
+    doc.text(optText, 60, textY, { width: ORDER_ITEM_OPTION_WIDTH })
+    textY += ORDER_ITEM_LINE_HEIGHT
+  })
+
+  item.customizationOptions.forEach(opt => {
+    let optText = `  • ${opt.title}${opt.price > 0 ? ` (+$${opt.price.toFixed(2)})` : ''}`
+    if (opt.customName) optText += ` - ${opt.customName}`
+    if (opt.customNumber) optText += ` #${opt.customNumber}`
+    doc.text(optText, 60, textY, { width: ORDER_ITEM_OPTION_WIDTH })
+    textY += ORDER_ITEM_LINE_HEIGHT
+  })
+
+  return currentY + rowHeight
+}
+
 interface InvoiceData {
   orderNumber: string
   shortOrderNumber: string
@@ -204,10 +325,12 @@ async function generateMinimalTemplate(filepath: string, data: InvoiceData): Pro
 
     data.items.forEach((item) => {
       const itemTotal = item.totalPrice * item.quantity
-      doc.fontSize(10).text(`${item.productName} (${[item.color, item.size].filter(Boolean).join(' / ')})`, { continued: true })
+      const productLabel = formatOrderItemLabel(item)
+      doc.fontSize(10).text(productLabel, { width: 450, continued: true })
       doc.text(`$${itemTotal.toFixed(2)}`, { align: 'right' })
-      
+
       if (item.quantity > 1) {
+        doc.moveDown(0.2)
         doc.fontSize(8).text(`  Qty: ${item.quantity} × $${item.totalPrice.toFixed(2)}`)
       }
       
@@ -313,57 +436,7 @@ async function generateProfessionalTemplateBuffer(data: InvoiceData): Promise<Bu
     currentY += 20
 
     data.items.forEach((item, index) => {
-      const itemTotal = item.totalPrice * item.quantity
-      const bgColor = index % 2 === 0 ? '#f3f4f6' : '#ffffff'
-      
-      // Calculate the number of lines dynamically
-      let lineCount = 1 // Product name line
-      if (item.quantity > 1) lineCount += 1 // Quantity line
-      lineCount += item.designOptions.length // Design option lines
-      lineCount += item.customizationOptions.length // Customization option lines
-      
-      // Calculate row height based on actual line count
-      const baseHeight = 18
-      const lineHeight = 13
-      const topPadding = 5
-      const bottomPadding = 5
-      const rowHeight = topPadding + baseHeight + ((lineCount - 1) * lineHeight) + bottomPadding
-      
-      // Background for entire row
-      doc.rect(50, currentY, 495, rowHeight).fillAndStroke(bgColor, bgColor)
-      
-      // Product name and total
-      doc.fontSize(10).fillColor('#000000')
-      doc.text(`${item.productName} (${[item.color, item.size].filter(Boolean).join(' / ')})`, 60, currentY + topPadding, { width: 350, continued: false })
-      doc.text(`$${itemTotal.toFixed(2)}`, 480, currentY + topPadding, { width: 55, align: 'right' })
-      
-      let textY = currentY + topPadding + 14 // Start below product name
-      
-      // Quantity info (if > 1)
-      if (item.quantity > 1) {
-        doc.fontSize(8).fillColor('#666666')
-        doc.text(`Qty: ${item.quantity} × $${item.totalPrice.toFixed(2)}`, 60, textY)
-        textY += lineHeight
-      }
-      
-      // Options (same background color, closer to parent)
-      doc.fontSize(8).fillColor('#666666')
-      
-      item.designOptions.forEach((opt) => {
-        const optText = `  • ${opt.title}${opt.price > 0 ? ` (+$${opt.price.toFixed(2)})` : ''}`
-        doc.text(optText, 60, textY, { width: 470 })
-        textY += lineHeight
-      })
-      
-      item.customizationOptions.forEach((opt) => {
-        let optText = `  • ${opt.title}${opt.price > 0 ? ` (+$${opt.price.toFixed(2)})` : ''}`
-        if (opt.customName) optText += ` - ${opt.customName}`
-        if (opt.customNumber) optText += ` #${opt.customNumber}`
-        doc.text(optText, 60, textY, { width: 470 })
-        textY += lineHeight
-      })
-      
-      currentY += rowHeight
+      currentY = drawProfessionalOrderItem(doc, item, currentY, index)
     })
 
     // Total due (full width, slightly darker gray, larger font)
@@ -475,59 +548,7 @@ async function generateProfessionalTemplate(filepath: string, data: InvoiceData)
     currentY += 20
 
     data.items.forEach((item, index) => {
-      const itemTotal = item.totalPrice * item.quantity
-      const bgColor = index % 2 === 0 ? '#f3f4f6' : '#ffffff'
-      
-      // Calculate the number of lines dynamically
-      let lineCount = 1 // Product name line
-      if (item.quantity > 1) lineCount += 1 // Quantity line
-      lineCount += item.designOptions.length // Design option lines
-      lineCount += item.customizationOptions.length // Customization option lines
-      
-      // Calculate row height based on actual line count
-      // Base height: 18px for product name + 5px top padding + 5px bottom padding
-      // Each additional line: 13px
-      const baseHeight = 18
-      const lineHeight = 13
-      const topPadding = 5
-      const bottomPadding = 5
-      const rowHeight = topPadding + baseHeight + ((lineCount - 1) * lineHeight) + bottomPadding
-      
-      // Background for entire row
-      doc.rect(50, currentY, 495, rowHeight).fillAndStroke(bgColor, bgColor)
-      
-      // Product name and total
-      doc.fontSize(10).fillColor('#000000')
-      doc.text(`${item.productName} (${[item.color, item.size].filter(Boolean).join(' / ')})`, 60, currentY + topPadding, { width: 350, continued: false })
-      doc.text(`$${itemTotal.toFixed(2)}`, 480, currentY + topPadding, { width: 55, align: 'right' })
-      
-      let textY = currentY + topPadding + 14 // Start below product name
-      
-      // Quantity info (if > 1)
-      if (item.quantity > 1) {
-        doc.fontSize(8).fillColor('#666666')
-        doc.text(`Qty: ${item.quantity} × $${item.totalPrice.toFixed(2)}`, 60, textY)
-        textY += lineHeight
-      }
-      
-      // Options (same background color, closer to parent)
-      doc.fontSize(8).fillColor('#666666')
-      
-      item.designOptions.forEach((opt) => {
-        const optText = `  • ${opt.title}${opt.price > 0 ? ` (+$${opt.price.toFixed(2)})` : ''}`
-        doc.text(optText, 60, textY, { width: 470 })
-        textY += lineHeight
-      })
-      
-      item.customizationOptions.forEach((opt) => {
-        let optText = `  • ${opt.title}${opt.price > 0 ? ` (+$${opt.price.toFixed(2)})` : ''}`
-        if (opt.customName) optText += ` - ${opt.customName}`
-        if (opt.customNumber) optText += ` #${opt.customNumber}`
-        doc.text(optText, 60, textY, { width: 470 })
-        textY += lineHeight
-      })
-      
-      currentY += rowHeight
+      currentY = drawProfessionalOrderItem(doc, item, currentY, index)
     })
 
     // Total due (full width, slightly darker gray, larger font)
