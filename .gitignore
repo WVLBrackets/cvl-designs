@@ -42,3 +42,7 @@ next-env.d.ts
 # error logs (may contain sensitive information)
 /logs/
 
+# local studio gallery uploads (admin uses Vercel Blob in hosted envs)
+/public/images/gallery/*
+!/public/images/gallery/.gitkeep
+

@@ -176,3 +176,38 @@ export interface SiteConfiguration {
   [key: string]: string | number | boolean
 }
 
+/**
+ * Configurable studio gallery category (from Gallery Categories tab)
+ */
+export interface GalleryCategory {
+  slug: string
+  name: string
+  sortOrder: number
+  active: boolean
+}
+
+/**
+ * Studio gallery item. Price is admin-only and must not be sent to public APIs.
+ */
+export interface GalleryItem {
+  id: string
+  categorySlug: string
+  imageUrl: string
+  caption: string
+  featured: boolean
+  status: 'Public' | 'Draft'
+  price: number
+  createdAt: string
+}
+
+/**
+ * Public gallery payload (no price)
+ */
+export interface PublicGalleryItem {
+  id: string
+  categorySlug: string
+  imageUrl: string
+  caption: string
+  featured: boolean
+}
+
