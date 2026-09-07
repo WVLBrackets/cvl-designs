@@ -3,6 +3,8 @@
  */
 
 import { fetchStores, fetchConfiguration } from '@/lib/googleSheets'
+import { getStudioHomeContent, STUDIO_ROUTE } from '@/lib/studio'
+import StudioHomeTile from '@/components/StudioHomeTile'
 import Image from 'next/image'
 import Link from 'next/link'
 
@@ -51,6 +53,7 @@ export default async function HomePage({
     : '/images/brand/VL Design Logo.png'
   const logoSizePx = Number(config.Logo_Size || 80)
   const businessName = (config.BusinessName as string) || 'CVL Designs'
+  const studioHome = getStudioHomeContent(config)
 
   return (
     <main className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100">
@@ -165,6 +168,17 @@ export default async function HomePage({
           {stores.length === 0 && (
             <p className="text-center text-gray-500 py-8">No stores available at this time.</p>
           )}
+
+          <div className="max-w-lg mx-auto mt-10 pt-8 border-t border-gray-200">
+            <div className="w-[calc(50%-0.75rem)] mx-auto">
+              <StudioHomeTile
+                href={STUDIO_ROUTE}
+                title={studioHome.title}
+                imageSrc={studioHome.imageSrc}
+                fallbackImageSrc={studioHome.fallbackImageSrc}
+              />
+            </div>
+          </div>
         </div>
       </div>
 
