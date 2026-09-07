@@ -21,6 +21,15 @@ function safeFileName(originalName: string): string {
 }
 
 /**
+ * True when this deployment can write gallery files to Vercel Blob.
+ * Connected stores use BLOB_STORE_ID plus Vercel's rotating OIDC token.
+ * A static BLOB_READ_WRITE_TOKEN still works if present.
+ */
+function hasVercelBlobConfig(): boolean {
+  return Boolean(process.env.BLOB_READ_WRITE_TOKEN || process.env.BLOB_STORE_ID)
+}
+
+/**
  * Persist an uploaded gallery image and return a public URL.
  *
  * @param file - Image file from the admin form
@@ -37,18 +46,20 @@ export async function storeGalleryImage(file: File): Promise<string> {
   const buffer = Buffer.from(await file.arrayBuffer())
   const filename = safeFileName(file.name)
 
-  if (process.env.BLOB_READ_WRITE_TOKEN) {
+  if (hasVercelBlobConfig()) {
     const blob = await put(`gallery/${filename}`, buffer, {
       access: 'public',
       contentType: file.type,
-      token: process.env.BLOB_READ_WRITE_TOKEN,
+      ...(process.env.BLOB_READ_WRITE_TOKEN
+        ? { token: process.env.BLOB_READ_WRITE_TOKEN }
+        : {}),
     })
     return blob.url
   }
 
   if (process.env.VERCEL) {
     throw new Error(
-      'Gallery uploads need BLOB_READ_WRITE_TOKEN on Vercel. Add a Blob store to the project.'
+      'Gallery uploads need a Blob store connected to this Vercel project. Add Blob in Storage, then redeploy Preview.'
     )
   }
 
