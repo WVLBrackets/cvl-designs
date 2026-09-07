@@ -4,6 +4,7 @@
  * Admin Config sheet keys (Attribute | Value):
  * - Studio_Home_Title — label under the home-page tile
  * - Studio_Home_Image — filename in /images/brand/, or an absolute /path or URL
+ * - Studio_Home_Tagline — optional supporting line on banner/hero layouts
  */
 
 import type { SiteConfiguration } from './types'
@@ -22,6 +23,13 @@ export const STUDIO_TITLE_CONFIG_KEY = 'Studio_Home_Title'
 
 /** Config sheet attribute for the home-page studio tile image. */
 export const STUDIO_IMAGE_CONFIG_KEY = 'Studio_Home_Image'
+
+/** Fallback supporting line for banner and hero layouts. */
+export const DEFAULT_STUDIO_TAGLINE =
+  'Design custom balloon arches, banners, and event decor'
+
+/** Config sheet attribute for the optional studio tagline. */
+export const STUDIO_TAGLINE_CONFIG_KEY = 'Studio_Home_Tagline'
 
 /**
  * Read a trimmed string from site configuration.
@@ -57,6 +65,7 @@ export function resolveBrandImageSrc(
 
 export interface StudioHomeContent {
   title: string
+  tagline: string
   imageSrc: string
   fallbackImageSrc: string
 }
@@ -70,9 +79,11 @@ export interface StudioHomeContent {
 export function getStudioHomeContent(config: SiteConfiguration): StudioHomeContent {
   const configuredTitle = getConfigString(config, STUDIO_TITLE_CONFIG_KEY)
   const configuredImage = getConfigString(config, STUDIO_IMAGE_CONFIG_KEY)
+  const configuredTagline = getConfigString(config, STUDIO_TAGLINE_CONFIG_KEY)
 
   return {
     title: configuredTitle || DEFAULT_STUDIO_TITLE,
+    tagline: configuredTagline || DEFAULT_STUDIO_TAGLINE,
     imageSrc: resolveBrandImageSrc(configuredImage, DEFAULT_STUDIO_IMAGE_SRC),
     fallbackImageSrc: DEFAULT_STUDIO_IMAGE_SRC,
   }

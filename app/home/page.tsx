@@ -4,7 +4,7 @@
 
 import { fetchStores, fetchConfiguration } from '@/lib/googleSheets'
 import { getStudioHomeContent, STUDIO_ROUTE } from '@/lib/studio'
-import StudioHomeTile from '@/components/StudioHomeTile'
+import { StudioFeaturedTile } from '@/components/studio/StudioPlacements'
 import Image from 'next/image'
 import Link from 'next/link'
 
@@ -109,10 +109,19 @@ export default async function HomePage({
             </div>
           )}
           
-          <div className="text-center mb-4">
-            <h2 className="text-2xl font-bold text-gray-900">{homePageTitle}</h2>
-          </div>
-          <p className="text-gray-600 mb-8 text-center">{homePageInstruction}</p>
+          <StudioFeaturedTile
+            href={STUDIO_ROUTE}
+            title={studioHome.title}
+            tagline={studioHome.tagline}
+            imageSrc={studioHome.imageSrc}
+            fallbackImageSrc={studioHome.fallbackImageSrc}
+          />
+
+          <div className="border-t border-gray-200 mt-10 pt-8">
+            <div className="text-center mb-4">
+              <h2 className="text-2xl font-bold text-gray-900">{homePageTitle}</h2>
+            </div>
+            <p className="text-gray-600 mb-8 text-center">{homePageInstruction}</p>
           
           {/* 2x2 Grid of Store Buttons (75% size) */}
           <div className="grid grid-cols-2 gap-6 max-w-lg mx-auto">
@@ -165,19 +174,9 @@ export default async function HomePage({
             })}
           </div>
 
-          {stores.length === 0 && (
-            <p className="text-center text-gray-500 py-8">No stores available at this time.</p>
-          )}
-
-          <div className="max-w-lg mx-auto mt-10 pt-8 border-t border-gray-200">
-            <div className="w-[calc(50%-0.75rem)] mx-auto">
-              <StudioHomeTile
-                href={STUDIO_ROUTE}
-                title={studioHome.title}
-                imageSrc={studioHome.imageSrc}
-                fallbackImageSrc={studioHome.fallbackImageSrc}
-              />
-            </div>
+            {stores.length === 0 && (
+              <p className="text-center text-gray-500 py-8">No stores available at this time.</p>
+            )}
           </div>
         </div>
       </div>
