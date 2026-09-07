@@ -4,7 +4,7 @@
 
 import { fetchStores, fetchConfiguration } from '@/lib/googleSheets'
 import { getStudioHomeContent, STUDIO_ROUTE } from '@/lib/studio'
-import { StudioFeaturedTile } from '@/components/studio/StudioPlacements'
+import { StudioHeroBand } from '@/components/studio/StudioPlacements'
 import Image from 'next/image'
 import Link from 'next/link'
 
@@ -99,8 +99,16 @@ export default async function HomePage({
         </div>
       </header>
 
+      <StudioHeroBand
+        href={STUDIO_ROUTE}
+        title={studioHome.title}
+        tagline={studioHome.tagline}
+        imageSrc={studioHome.imageSrc}
+        fallbackImageSrc={studioHome.fallbackImageSrc}
+      />
+
       {/* Store Selector */}
-      <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+      <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className="bg-white rounded-lg shadow-lg p-8">
           {/* Error message banner */}
           {searchParams.error && (
@@ -108,20 +116,11 @@ export default async function HomePage({
               <p className="text-red-800 font-semibold text-center">{searchParams.error}</p>
             </div>
           )}
-          
-          <StudioFeaturedTile
-            href={STUDIO_ROUTE}
-            title={studioHome.title}
-            tagline={studioHome.tagline}
-            imageSrc={studioHome.imageSrc}
-            fallbackImageSrc={studioHome.fallbackImageSrc}
-          />
 
-          <div className="border-t border-gray-200 mt-10 pt-8">
-            <div className="text-center mb-4">
-              <h2 className="text-2xl font-bold text-gray-900">{homePageTitle}</h2>
-            </div>
-            <p className="text-gray-600 mb-8 text-center">{homePageInstruction}</p>
+          <div className="text-center mb-4">
+            <h2 className="text-2xl font-bold text-gray-900">{homePageTitle}</h2>
+          </div>
+          <p className="text-gray-600 mb-8 text-center">{homePageInstruction}</p>
           
           {/* 2x2 Grid of Store Buttons (75% size) */}
           <div className="grid grid-cols-2 gap-6 max-w-lg mx-auto">
@@ -174,10 +173,9 @@ export default async function HomePage({
             })}
           </div>
 
-            {stores.length === 0 && (
-              <p className="text-center text-gray-500 py-8">No stores available at this time.</p>
-            )}
-          </div>
+          {stores.length === 0 && (
+            <p className="text-center text-gray-500 py-8">No stores available at this time.</p>
+          )}
         </div>
       </div>
 
