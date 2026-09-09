@@ -316,7 +316,7 @@ export default function StudioAdminClient({ categories, items }: StudioAdminClie
   }
 
   return (
-    <div className="max-w-4xl mx-auto space-y-8 min-w-0">
+    <div className="w-full max-w-4xl mx-auto space-y-8 min-w-0 overflow-x-hidden">
       <div className="flex items-center justify-between gap-3 min-w-0">
         <h1 className="text-xl sm:text-2xl font-bold text-gray-900 truncate">Gallery admin</h1>
         <button type="button" onClick={logout} className="text-sm text-blue-600 underline flex-shrink-0">
@@ -333,13 +333,15 @@ export default function StudioAdminClient({ categories, items }: StudioAdminClie
 
         <label className="block text-sm font-medium text-gray-700 min-w-0">
           Photo
-          <input
-            type="file"
-            name="image"
-            accept="image/jpeg,image/png,image/webp,image/gif"
-            required
-            className="mt-1 block w-full max-w-full min-w-0 text-sm"
-          />
+          <span className="mt-1 block w-full max-w-full min-w-0 overflow-hidden">
+            <input
+              type="file"
+              name="image"
+              accept="image/jpeg,image/png,image/webp,image/gif"
+              required
+              className="block w-full max-w-full min-w-0 text-sm"
+            />
+          </span>
         </label>
 
         <label className="block text-sm font-medium text-gray-700">
@@ -390,24 +392,25 @@ export default function StudioAdminClient({ categories, items }: StudioAdminClie
       </form>
 
       <section ref={galleryRef} className="min-w-0 scroll-mt-4">
-        <div className="flex items-center justify-between gap-3 mb-2">
-          <h2 className="text-lg font-semibold text-gray-900">Current gallery</h2>
+        <div className="flex items-center justify-between gap-3 mb-2 min-w-0">
+          <h2 className="text-lg font-semibold text-gray-900 min-w-0 truncate">Current gallery</h2>
           <button
             type="button"
             disabled={!lastDeleted || pending}
             onClick={() => lastDeleted && setRecoverOpen(true)}
-            className="text-sm font-semibold text-blue-600 disabled:text-gray-400 disabled:cursor-not-allowed underline"
+            className="text-sm font-semibold text-blue-600 disabled:text-gray-400 disabled:cursor-not-allowed underline flex-shrink-0"
           >
             Undo
           </button>
         </div>
-        <p className="text-sm text-gray-600 mb-4">
+        <p className="text-sm text-gray-600 mb-4 break-words">
           Tap a photo to edit caption, category, price, or Public/Draft. Use In hero and the trash can without opening the photo.
         </p>
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-3 min-w-0">
           {galleryItems.map((item, index) => (
-            <article key={item.id} className="bg-white rounded-lg shadow overflow-hidden min-w-0">
-              <div className="relative aspect-square bg-gray-100">
+            <article key={item.id} className="bg-white rounded-lg shadow overflow-hidden min-w-0 max-w-full">
+              <div className="relative aspect-square bg-gray-100 overflow-hidden">
+                <Image src={item.imageUrl} alt={item.caption} fill className="object-cover" sizes="50vw" />
                 <button
                   type="button"
                   onClick={() => {
@@ -415,11 +418,9 @@ export default function StudioAdminClient({ categories, items }: StudioAdminClie
                     setError('')
                     setMessage('')
                   }}
-                  className="absolute inset-0"
+                  className="absolute inset-0 z-[1]"
                   aria-label={`Edit ${item.caption || 'photo'}`}
-                >
-                  <Image src={item.imageUrl} alt={item.caption} fill className="object-cover" sizes="50vw" />
-                </button>
+                />
                 <button
                   type="button"
                   disabled={pending}
