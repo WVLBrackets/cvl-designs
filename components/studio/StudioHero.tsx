@@ -118,12 +118,20 @@ export default function StudioHero({ items, title, tagline, onSelect }: StudioHe
               </button>
               <button
                 type="button"
-                className="absolute bottom-2 left-1/2 z-10 -translate-x-1/2 rounded-full bg-black/60 text-white text-xs font-semibold px-4 py-2 min-h-11"
+                className="absolute bottom-2 left-1/2 z-10 -translate-x-1/2 h-11 w-11 rounded-full bg-black/60 text-white flex items-center justify-center"
                 aria-label={paused ? 'Play slideshow' : 'Pause slideshow'}
                 aria-pressed={paused}
                 onClick={() => setPaused((value) => !value)}
               >
-                {paused ? 'Play' : 'Pause'}
+                {paused ? (
+                  <svg viewBox="0 0 24 24" className="h-5 w-5 fill-current" aria-hidden="true">
+                    <path d="M8 5v14l11-7z" />
+                  </svg>
+                ) : (
+                  <svg viewBox="0 0 24 24" className="h-5 w-5 fill-current" aria-hidden="true">
+                    <path d="M6 5h4v14H6zm8 0h4v14h-4z" />
+                  </svg>
+                )}
               </button>
             </>
           ) : null}

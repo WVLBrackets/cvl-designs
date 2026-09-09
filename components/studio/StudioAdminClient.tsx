@@ -97,7 +97,6 @@ export default function StudioAdminClient({ categories, items }: StudioAdminClie
   const [pending, setPending] = useState(false)
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
-  const [lastCaption, setLastCaption] = useState('')
   const [editing, setEditing] = useState<GalleryItem | null>(null)
 
   /**
@@ -123,8 +122,7 @@ export default function StudioAdminClient({ categories, items }: StudioAdminClie
         setError(result.error || 'Save failed')
         return
       }
-      setLastCaption(result.item?.caption || '')
-      setMessage('Saved to the gallery. Copy the caption below if you want to post it on Instagram or Facebook.')
+      setMessage('Saved to the gallery.')
       form.reset()
       router.refresh()
     } catch {
@@ -156,7 +154,6 @@ export default function StudioAdminClient({ categories, items }: StudioAdminClie
         setError(result.error || 'Update failed')
         return
       }
-      setLastCaption(result.item?.caption || '')
       setMessage('Updated. Visitors will see Public photos on the studio page.')
       setEditing(null)
       router.refresh()
@@ -165,15 +162,6 @@ export default function StudioAdminClient({ categories, items }: StudioAdminClie
     } finally {
       setPending(false)
     }
-  }
-
-  /**
-   * Copy the most recently saved caption for a manual social post.
-   */
-  async function copyCaption() {
-    if (!lastCaption) return
-    await navigator.clipboard.writeText(lastCaption)
-    setMessage('Caption copied. Paste it into Instagram or Facebook with the photo.')
   }
 
   /**
@@ -248,11 +236,6 @@ export default function StudioAdminClient({ categories, items }: StudioAdminClie
 
         {error && !editing ? <p className="text-sm text-red-600 break-words">{error}</p> : null}
         {message && !editing ? <p className="text-sm text-green-700 break-words">{message}</p> : null}
-        {lastCaption && !editing ? (
-          <button type="button" onClick={copyCaption} className="text-sm text-blue-600 underline">
-            Copy last caption
-          </button>
-        ) : null}
 
         <button
           type="submit"
@@ -268,29 +251,39 @@ export default function StudioAdminClient({ categories, items }: StudioAdminClie
         <p className="text-sm text-gray-600 mb-4">Tap a photo to change its caption, category, price, featured flag, or Public/Draft status.</p>
         <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
           {items.map((item) => (
-            <button
-              key={item.id}
-              type="button"
-              onClick={() => {
-                setEditing(item)
-                setError('')
-                setMessage('')
-              }}
-              className="text-left bg-white rounded-lg shadow overflow-hidden min-w-0"
-            >
-              <div className="relative aspect-square bg-gray-100">
-                <Image src={item.imageUrl} alt={item.caption} fill className="object-cover" sizes="50vw" />
-              </div>
-              <div className="p-3 min-w-0">
-                <p className="font-semibold text-pink-600 truncate">{item.categorySlug}</p>
-                <p className="text-gray-800 line-clamp-2 break-words">{item.caption}</p>
-                <p className="text-xs text-gray-500 mt-1 break-words">
-                  {item.status}
-                  {item.featured ? ' · Featured' : ''}
-                  {item.price ? ` · $${item.price.toFixed(0)} internal` : ''}
-                </p>
-              </div>
-            </button>
+            <article key={item.id} className="bg-white rounded-lg shadow overflow-hidden min-w-0">
+              <button
+                type="button"
+                onClick={() => {
+                  setEditing(item)
+                  setError('')
+                  setMessage('')
+                }}
+                className="w-full text-left min-w-0"
+              >
+                <div className="relative aspect-square bg-gray-100">
+                  <Image src={item.imageUrl} alt={item.caption} fill className="object-cover" sizes="50vw" />
+                </div>
+                <div className="p-3 pb-1 min-w-0">
+                  <p className="font-semibold text-pink-600 truncate">{item.categorySlug}</p>
+                  <p className="text-gray-800 line-clamp-2 break-words">{item.caption}</p>
+                  <p className="text-xs text-gray-500 mt-1 break-words">
+                    {item.status}
+                    {item.price ? ` · $${item.price.toFixed(0)} internal` : ''}
+                  </p>
+                </div>
+              </button>
+              <label className="flex items-center gap-2 px-3 pb-3 text-xs text-gray-700">
+                <input
+                  type="checkbox"
+                  checked={item.featured}
+                  readOnly
+                  tabIndex={-1}
+                  className="rounded pointer-events-none"
+                />
+                In hero
+              </label>
+            </article>
           ))}
         </div>
         {items.length === 0 ? (
