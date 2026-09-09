@@ -253,3 +253,65 @@ export async function createGalleryItem(input: CreateGalleryItemInput): Promise<
     createdAt,
   }
 }
+
+export interface UpdateGalleryItemInput {
+  id: string
+  categorySlug: string
+  caption: string
+  featured: boolean
+  status: 'Public' | 'Draft'
+  price: number
+}
+
+/**
+ * Update caption, category, featured flag, visibility, and internal price for an existing gallery row.
+ * Image URL and createdAt stay as stored.
+ *
+ * @param input - Fields to write onto the matching Gallery tab row
+ * @returns The updated item, or null when the id is not in the sheet
+ */
+export async function updateGalleryItem(input: UpdateGalleryItemInput): Promise<GalleryItem | null> {
+  await ensureGalleryTabs()
+  const sheets = await getSheetsClient()
+  const spreadsheetId = getSheetId('config')
+  const response = await sheets.spreadsheets.values.get({
+    spreadsheetId,
+    range: `${ITEMS_TAB}!A2:H200`,
+  })
+  const rows = response.data.values || []
+  const index = rows.findIndex((row) => String(row[0] || '').trim() === input.id)
+  if (index < 0) return null
+
+  const existing = parseGalleryRow(rows[index])
+  if (!existing) return null
+
+  const next: GalleryItem = {
+    ...existing,
+    categorySlug: input.categorySlug,
+    caption: input.caption,
+    featured: input.featured,
+    status: input.status,
+    price: input.price || 0,
+  }
+  const rowNumber = index + 2
+
+  await sheets.spreadsheets.values.update({
+    spreadsheetId,
+    range: `${ITEMS_TAB}!A${rowNumber}:H${rowNumber}`,
+    valueInputOption: 'RAW',
+    requestBody: {
+      values: [[
+        next.id,
+        next.categorySlug,
+        next.imageUrl,
+        next.caption,
+        next.featured ? 'TRUE' : 'FALSE',
+        next.status,
+        next.price || 0,
+        next.createdAt,
+      ]],
+    },
+  })
+
+  return next
+}

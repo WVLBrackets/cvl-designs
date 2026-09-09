@@ -9,6 +9,7 @@ import {
   createGalleryItem,
   fetchGalleryCategories,
   fetchGalleryItems,
+  updateGalleryItem,
 } from '@/lib/gallery'
 import { storeGalleryImage } from '@/lib/galleryImage'
 
@@ -71,6 +72,56 @@ export async function POST(request: NextRequest) {
       {
         success: false,
         error: error instanceof Error ? error.message : 'Failed to save gallery item',
+      },
+      { status: 500 }
+    )
+  }
+}
+
+export async function PATCH(request: NextRequest) {
+  const cookieStore = cookies()
+  if (!isValidStudioAdminCookie(cookieStore.get(STUDIO_ADMIN_COOKIE)?.value)) {
+    return unauthorized()
+  }
+
+  try {
+    const body = await request.json()
+    const id = String(body.id || '').trim()
+    const caption = String(body.caption || '').trim()
+    const categorySlug = String(body.categorySlug || '').trim().toLowerCase()
+    const featured = Boolean(body.featured)
+    const status = String(body.status || 'Public') === 'Draft' ? 'Draft' : 'Public'
+    const price = Number(body.price || 0) || 0
+
+    if (!id) {
+      return NextResponse.json({ success: false, error: 'Missing gallery item' }, { status: 400 })
+    }
+    if (!caption) {
+      return NextResponse.json({ success: false, error: 'Caption is required' }, { status: 400 })
+    }
+    if (!categorySlug) {
+      return NextResponse.json({ success: false, error: 'Category is required' }, { status: 400 })
+    }
+
+    const item = await updateGalleryItem({
+      id,
+      categorySlug,
+      caption,
+      featured,
+      status,
+      price,
+    })
+    if (!item) {
+      return NextResponse.json({ success: false, error: 'That photo was not found' }, { status: 404 })
+    }
+
+    return NextResponse.json({ success: true, item })
+  } catch (error) {
+    console.error('[api/studio/admin/gallery]', error)
+    return NextResponse.json(
+      {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to update gallery item',
       },
       { status: 500 }
     )

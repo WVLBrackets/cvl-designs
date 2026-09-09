@@ -33,10 +33,10 @@ export default function StudioGalleryClient({
     categories.find((c) => c.slug === slug)?.name || slug
 
   return (
-    <div>
+    <div className="min-w-0 max-w-full overflow-x-hidden">
       <StudioHero items={items} title={title} tagline={tagline} onSelect={setActive} />
 
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-10">
+      <div className="max-w-6xl mx-auto px-3 sm:px-6 py-8 sm:py-10 min-w-0">
         <div className="flex flex-wrap gap-2 justify-center mb-8">
           <button
             type="button"
@@ -70,13 +70,13 @@ export default function StudioGalleryClient({
             No pieces in this category yet. Caryn’s latest work will show up here.
           </p>
         ) : (
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-4 md:gap-6">
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-6">
             {visible.map((item) => (
               <button
                 key={item.id}
                 type="button"
                 onClick={() => setActive(item)}
-                className="group text-left bg-white rounded-lg shadow-sm overflow-hidden hover:shadow-lg transition-shadow"
+                className="group text-left bg-white rounded-lg shadow-sm overflow-hidden hover:shadow-lg transition-shadow min-w-0"
               >
                 <div className="relative aspect-square bg-gray-100">
                   <Image
@@ -87,11 +87,11 @@ export default function StudioGalleryClient({
                     sizes="(max-width: 768px) 50vw, 33vw"
                   />
                 </div>
-                <div className="p-3">
+                <div className="p-3 min-w-0">
                   <p className="text-xs uppercase tracking-wide text-pink-600 font-semibold">
                     {categoryName(item.categorySlug)}
                   </p>
-                  <p className="mt-1 text-sm text-gray-800 line-clamp-2">{item.caption}</p>
+                  <p className="mt-1 text-sm text-gray-800 line-clamp-2 break-words">{item.caption}</p>
                 </div>
               </button>
             ))}
@@ -101,14 +101,14 @@ export default function StudioGalleryClient({
 
       {active ? (
         <div
-          className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4"
+          className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-3 overflow-y-auto"
           onClick={() => setActive(null)}
           role="dialog"
           aria-modal="true"
           aria-label={active.caption || 'Gallery image'}
         >
           <div
-            className="bg-white rounded-xl max-w-3xl w-full overflow-hidden"
+            className="bg-white rounded-xl w-full max-w-3xl max-h-[90vh] overflow-y-auto min-w-0"
             onClick={(event) => event.stopPropagation()}
           >
             <div className="relative w-full aspect-[4/3] bg-gray-100">
@@ -124,7 +124,7 @@ export default function StudioGalleryClient({
               <p className="text-xs uppercase tracking-wide text-pink-600 font-semibold">
                 {categoryName(active.categorySlug)}
               </p>
-              <p className="mt-2 text-gray-800">{active.caption}</p>
+              <p className="mt-2 text-gray-800 break-words">{active.caption}</p>
               <button
                 type="button"
                 onClick={() => setActive(null)}

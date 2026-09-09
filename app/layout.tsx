@@ -9,6 +9,11 @@ export const metadata: Metadata = {
   description: 'Custom Apparel & Clothing',
 }
 
+export const viewport = {
+  width: 'device-width',
+  initialScale: 1,
+}
+
 export default function RootLayout({
   children,
 }: {
@@ -20,14 +25,14 @@ export default function RootLayout({
   const envName = process.env.VERCEL_ENV || 'development'
   
   return (
-    <html lang="en">
-      <body className={inter.className}>
+    <html lang="en" className="overflow-x-hidden">
+      <body className={`${inter.className} overflow-x-hidden max-w-full`}>
         {/* Staging/Preview Banner - Only shows in non-production */}
         {!isProduction && (
-          <div className="fixed top-4 right-4 z-50 pointer-events-none">
-            <div className="bg-red-600 text-white px-4 py-2 rounded-lg shadow-lg font-bold text-sm flex items-center gap-2 border-2 border-red-800 rotate-12">
-              <span className="text-xl">⚠️</span>
-              <span>{envName.toUpperCase()}</span>
+          <div className="fixed top-2 right-2 z-50 pointer-events-none max-w-[40vw]">
+            <div className="bg-red-600 text-white px-2 py-1 rounded-lg shadow-lg font-bold text-[10px] sm:text-sm flex items-center gap-1 border-2 border-red-800 rotate-12">
+              <span className="text-sm sm:text-xl">⚠️</span>
+              <span className="truncate">{envName.toUpperCase()}</span>
             </div>
           </div>
         )}

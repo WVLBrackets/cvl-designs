@@ -32,8 +32,8 @@ export default async function StudioAdminPage() {
   }
 
   return (
-    <main className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100 py-10 px-4">
-      <div className="max-w-4xl mx-auto mb-6">
+    <main className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100 py-6 px-3 overflow-x-hidden max-w-full">
+      <div className="max-w-4xl mx-auto mb-4 min-w-0">
         <Link href="/studio" className="text-sm text-blue-600 underline">
           ← Public studio
         </Link>
