@@ -7,8 +7,10 @@ import { cookies } from 'next/headers'
 import { isValidStudioAdminCookie, STUDIO_ADMIN_COOKIE } from '@/lib/studioAdminAuth'
 import {
   createGalleryItem,
+  deleteGalleryItem,
   fetchGalleryCategories,
   fetchGalleryItems,
+  restoreGalleryItem,
   updateGalleryItem,
 } from '@/lib/gallery'
 import { storeGalleryImage } from '@/lib/galleryImage'
@@ -122,6 +124,76 @@ export async function PATCH(request: NextRequest) {
       {
         success: false,
         error: error instanceof Error ? error.message : 'Failed to update gallery item',
+      },
+      { status: 500 }
+    )
+  }
+}
+
+export async function DELETE(request: NextRequest) {
+  const cookieStore = cookies()
+  if (!isValidStudioAdminCookie(cookieStore.get(STUDIO_ADMIN_COOKIE)?.value)) {
+    return unauthorized()
+  }
+
+  try {
+    const id = String(request.nextUrl.searchParams.get('id') || '').trim()
+    if (!id) {
+      return NextResponse.json({ success: false, error: 'Missing gallery item' }, { status: 400 })
+    }
+
+    const item = await deleteGalleryItem(id)
+    if (!item) {
+      return NextResponse.json({ success: false, error: 'That photo was not found' }, { status: 404 })
+    }
+
+    return NextResponse.json({ success: true, item })
+  } catch (error) {
+    console.error('[api/studio/admin/gallery]', error)
+    return NextResponse.json(
+      {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to delete gallery item',
+      },
+      { status: 500 }
+    )
+  }
+}
+
+export async function PUT(request: NextRequest) {
+  const cookieStore = cookies()
+  if (!isValidStudioAdminCookie(cookieStore.get(STUDIO_ADMIN_COOKIE)?.value)) {
+    return unauthorized()
+  }
+
+  try {
+    const body = await request.json()
+    const id = String(body.id || '').trim()
+    const imageUrl = String(body.imageUrl || '').trim()
+    const caption = String(body.caption || '').trim()
+    const categorySlug = String(body.categorySlug || '').trim().toLowerCase()
+    if (!id || !imageUrl || !caption || !categorySlug) {
+      return NextResponse.json({ success: false, error: 'That photo cannot be restored' }, { status: 400 })
+    }
+
+    const item = await restoreGalleryItem({
+      id,
+      imageUrl,
+      caption,
+      categorySlug,
+      featured: Boolean(body.featured),
+      status: String(body.status || 'Public') === 'Draft' ? 'Draft' : 'Public',
+      price: Number(body.price || 0) || 0,
+      createdAt: String(body.createdAt || ''),
+    })
+
+    return NextResponse.json({ success: true, item })
+  } catch (error) {
+    console.error('[api/studio/admin/gallery]', error)
+    return NextResponse.json(
+      {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to restore gallery item',
       },
       { status: 500 }
     )

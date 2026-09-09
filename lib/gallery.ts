@@ -315,3 +315,109 @@ export async function updateGalleryItem(input: UpdateGalleryItemInput): Promise<
 
   return next
 }
+
+/**
+ * Convert a gallery item to a Gallery tab row.
+ *
+ * @param item - Item to persist
+ */
+function galleryItemToRow(item: GalleryItem): (string | number)[] {
+  return [
+    item.id,
+    item.categorySlug,
+    item.imageUrl,
+    item.caption,
+    item.featured ? 'TRUE' : 'FALSE',
+    item.status,
+    item.price || 0,
+    item.createdAt,
+  ]
+}
+
+/**
+ * Look up the numeric sheet id for the Gallery tab.
+ */
+async function getGalleryTabSheetId(): Promise<number> {
+  const sheets = await getSheetsClient()
+  const spreadsheetId = getSheetId('config')
+  const meta = await sheets.spreadsheets.get({
+    spreadsheetId,
+    fields: 'sheets.properties',
+  })
+  const tab = meta.data.sheets?.find((sheet) => sheet.properties?.title === ITEMS_TAB)
+  const sheetId = tab?.properties?.sheetId
+  if (sheetId === undefined || sheetId === null) {
+    throw new Error('Gallery tab was not found')
+  }
+  return sheetId
+}
+
+/**
+ * Remove a gallery row by id.
+ *
+ * @param id - Gallery item id
+ * @returns The deleted item, or null when the id is not in the sheet
+ */
+export async function deleteGalleryItem(id: string): Promise<GalleryItem | null> {
+  await ensureGalleryTabs()
+  const sheets = await getSheetsClient()
+  const spreadsheetId = getSheetId('config')
+  const response = await sheets.spreadsheets.values.get({
+    spreadsheetId,
+    range: `${ITEMS_TAB}!A2:H200`,
+  })
+  const rows = response.data.values || []
+  const index = rows.findIndex((row) => String(row[0] || '').trim() === id)
+  if (index < 0) return null
+
+  const existing = parseGalleryRow(rows[index])
+  if (!existing) return null
+
+  const sheetId = await getGalleryTabSheetId()
+  await sheets.spreadsheets.batchUpdate({
+    spreadsheetId,
+    requestBody: {
+      requests: [
+        {
+          deleteDimension: {
+            range: {
+              sheetId,
+              dimension: 'ROWS',
+              startIndex: index + 1,
+              endIndex: index + 2,
+            },
+          },
+        },
+      ],
+    },
+  })
+
+  return existing
+}
+
+/**
+ * Write a previously deleted gallery item back onto the Gallery tab.
+ *
+ * @param item - Full item snapshot from before delete
+ */
+export async function restoreGalleryItem(item: GalleryItem): Promise<GalleryItem> {
+  await ensureGalleryTabs()
+  const sheets = await getSheetsClient()
+  const spreadsheetId = getSheetId('config')
+  const response = await sheets.spreadsheets.values.get({
+    spreadsheetId,
+    range: `${ITEMS_TAB}!A2:H200`,
+  })
+  const rows = response.data.values || []
+  const exists = rows.some((row) => String(row[0] || '').trim() === item.id)
+  if (exists) return item
+
+  await sheets.spreadsheets.values.append({
+    spreadsheetId,
+    range: `${ITEMS_TAB}!A2`,
+    valueInputOption: 'RAW',
+    requestBody: { values: [galleryItemToRow(item)] },
+  })
+
+  return item
+}
