@@ -12,6 +12,7 @@ export const metadata: Metadata = {
 export const viewport = {
   width: 'device-width',
   initialScale: 1,
+  maximumScale: 5,
 }
 
 export default function RootLayout({
@@ -25,18 +26,20 @@ export default function RootLayout({
   const envName = process.env.VERCEL_ENV || 'development'
   
   return (
-    <html lang="en" className="overflow-x-hidden">
-      <body className={`${inter.className} overflow-x-hidden max-w-full`}>
-        {/* Staging/Preview Banner - Only shows in non-production */}
+    <html lang="en">
+      <body className={`${inter.className} w-full max-w-full overflow-x-clip`}>
+        {/* Staging/Preview Banner - Only shows in non-production. No rotate: iOS treats
+            transformed corners as extra page width and forces pinch-to-fit. */}
         {!isProduction && (
-          <div className="fixed top-2 right-2 z-50 pointer-events-none max-w-[40vw]">
-            <div className="bg-red-600 text-white px-2 py-1 rounded-lg shadow-lg font-bold text-[10px] sm:text-sm flex items-center gap-1 border-2 border-red-800 rotate-12">
-              <span className="text-sm sm:text-xl">⚠️</span>
-              <span className="truncate">{envName.toUpperCase()}</span>
+          <div className="pointer-events-none fixed inset-0 z-50 overflow-hidden" aria-hidden>
+            <div className="absolute top-2 right-2 rounded-md bg-red-600 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-white shadow">
+              {envName}
             </div>
           </div>
         )}
-        {children}
+        <div className="w-full max-w-full overflow-x-clip">
+          {children}
+        </div>
       </body>
     </html>
   )

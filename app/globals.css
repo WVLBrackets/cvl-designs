@@ -37,13 +37,17 @@
   --background-end-rgb: 255, 255, 255;
 }
 
-html,
-body {
+html {
+  width: 100%;
   max-width: 100%;
-  overflow-x: hidden;
+  overflow-x: clip;
 }
 
 body {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: clip;
+  overflow-wrap: anywhere;
   color: rgb(var(--foreground-rgb));
   background: linear-gradient(
       to bottom,

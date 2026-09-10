@@ -87,7 +87,7 @@ export default function StudioHero({ items, title, tagline, onSelect }: StudioHe
             alt={caption}
             fill
             className="object-cover"
-            sizes="(max-width: 768px) 100vw, 60vw"
+            sizes="(max-width: 768px) 100%, 60vw"
             priority
           />
           {current && onSelect ? (

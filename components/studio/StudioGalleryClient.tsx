@@ -111,7 +111,7 @@ export default function StudioGalleryClient({
             className="bg-white rounded-xl w-full max-w-3xl max-h-[90vh] overflow-y-auto min-w-0"
             onClick={(event) => event.stopPropagation()}
           >
-            <div className="relative w-full aspect-[4/3] bg-gray-100">
+            <div className="relative w-full aspect-[4/3] bg-gray-100 overflow-hidden">
               <Image
                 src={active.imageUrl}
                 alt={active.caption || 'Gallery piece'}

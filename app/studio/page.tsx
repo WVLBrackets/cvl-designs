@@ -46,7 +46,7 @@ export default async function StudioPage() {
   const businessName = (config.BusinessName as string) || 'CVL Designs'
 
   return (
-    <main className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100 overflow-x-hidden max-w-full">
+    <main className="min-h-screen w-full max-w-full bg-gradient-to-b from-gray-50 to-gray-100 overflow-x-clip">
       <StudioPublicHeader businessName={businessName} logoSrc={headerLogoSrc} />
 
       <StudioGalleryClient
