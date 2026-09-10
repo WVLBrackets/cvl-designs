@@ -33,7 +33,7 @@ export default function RootLayout({
         {!isProduction && (
           <div className="pointer-events-none fixed inset-0 z-50 overflow-hidden" aria-hidden>
             <div className="absolute top-2 right-2 rounded-md bg-red-600 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-white shadow">
-              {envName}
+              {envName.toUpperCase()}
             </div>
           </div>
         )}

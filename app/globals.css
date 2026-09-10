@@ -47,7 +47,7 @@ body {
   width: 100%;
   max-width: 100%;
   overflow-x: clip;
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
   color: rgb(var(--foreground-rgb));
   background: linear-gradient(
       to bottom,
