@@ -3,7 +3,7 @@
  */
 
 import { google } from 'googleapis'
-import { getGoogleSheetsConfig, getSheetId, getEnvironment } from './config'
+import { getGoogleSheetsConfig, getSheetId, getEnvironment, isProductionSurface } from './config'
 import type { 
   Product, 
   Order, 
@@ -255,16 +255,29 @@ export async function fetchConfiguration(): Promise<SiteConfiguration> {
     
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId,
-      range: 'A2:B100', // Assuming Attribute in A, Value in B, starting from row 2
+      range: 'A2:C100', // Attribute, Production Value, Preview Value
     })
     
     const rows = response.data.values || []
     const config: SiteConfiguration = {}
+    const useProduction = isProductionSurface()
     
     rows.forEach(row => {
-      const [attribute, value] = row
-      if (attribute && value !== undefined) {
-        config[attribute] = value
+      const attribute = row[0]
+      if (!attribute) return
+
+      const productionValue = row[1]
+      const previewValue = row[2]
+      const previewFilled =
+        previewValue !== undefined && String(previewValue).trim() !== ''
+      const value = useProduction
+        ? productionValue
+        : previewFilled
+          ? previewValue
+          : productionValue
+
+      if (value !== undefined && String(value).trim() !== '') {
+        config[String(attribute)] = value
       }
     })
     

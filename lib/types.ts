@@ -184,6 +184,7 @@ export interface GalleryCategory {
   name: string
   sortOrder: number
   active: boolean
+  environment?: string
 }
 
 /**
@@ -198,6 +199,7 @@ export interface GalleryItem {
   status: 'Public' | 'Draft'
   price: number
   createdAt: string
+  environment?: string
 }
 
 /**

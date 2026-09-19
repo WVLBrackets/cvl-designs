@@ -7,7 +7,9 @@ interface StudioHomeContentProps {
   href: string
   title: string
   tagline: string
+  buttonLabel?: string
   imageSrc: string
+  rightImageSrc?: string
   fallbackImageSrc: string
 }
 
@@ -47,6 +49,7 @@ export function StudioLeadBanner({
   href,
   title,
   tagline,
+  buttonLabel,
   imageSrc,
   fallbackImageSrc,
 }: StudioHomeContentProps) {
@@ -61,13 +64,10 @@ export function StudioLeadBanner({
           <FallbackImage src={imageSrc} fallbackSrc={fallbackImageSrc} alt="" />
         </div>
         <div className="text-center sm:text-left flex-1">
-          <p className="text-xs font-semibold uppercase tracking-wide text-pink-500 mb-1">
-            Design Studio
-          </p>
           <p className="text-2xl font-bold text-gray-900">{title}</p>
           {tagline ? <p className="mt-1 text-gray-600">{tagline}</p> : null}
           <span className="inline-block mt-3 px-4 py-2 rounded-lg bg-pink-500 group-hover:bg-pink-600 text-white text-sm font-semibold">
-            Open Studio
+            {buttonLabel || 'Open Studio'}
           </span>
         </div>
       </div>
@@ -82,7 +82,9 @@ export function StudioHeroBand({
   href,
   title,
   tagline,
+  buttonLabel,
   imageSrc,
+  rightImageSrc,
   fallbackImageSrc,
 }: StudioHomeContentProps) {
   return (
@@ -91,20 +93,22 @@ export function StudioHeroBand({
       className="block group bg-gradient-to-r from-pink-100 via-rose-50 to-sky-100 border-y border-pink-200 hover:from-pink-200/80 transition-colors"
       aria-label={`${title} design studio`}
     >
-      <div className="max-w-3xl mx-auto px-4 sm:px-6 py-8 sm:py-10 flex flex-col sm:flex-row items-center gap-6">
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 py-6 sm:py-8 flex flex-col sm:flex-row items-center gap-6">
         <div className="relative w-36 h-36 sm:w-40 sm:h-40 flex-shrink-0">
           <FallbackImage src={imageSrc} fallbackSrc={fallbackImageSrc} alt="" />
         </div>
-        <div className="text-center sm:text-left">
-          <p className="text-xs font-semibold uppercase tracking-wide text-pink-600 mb-1">
-            Design Studio
-          </p>
+        <div className="text-center sm:text-left flex-1 min-w-0">
           <p className="text-3xl sm:text-4xl font-bold text-gray-900">{title}</p>
           {tagline ? <p className="mt-2 text-lg text-gray-600">{tagline}</p> : null}
           <span className="inline-block mt-4 px-5 py-2.5 rounded-lg bg-pink-500 group-hover:bg-pink-600 text-white font-semibold">
-            Open Studio
+            {buttonLabel || 'Open Studio'}
           </span>
         </div>
+        {rightImageSrc ? (
+          <div className="relative w-36 h-36 sm:w-40 sm:h-40 flex-shrink-0">
+            <FallbackImage src={rightImageSrc} fallbackSrc={fallbackImageSrc} alt="" />
+          </div>
+        ) : null}
       </div>
     </Link>
   )

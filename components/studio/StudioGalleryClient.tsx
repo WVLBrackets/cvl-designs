@@ -8,6 +8,7 @@ import type { GalleryCategory, PublicGalleryItem } from '@/lib/types'
 interface StudioGalleryClientProps {
   title: string
   tagline: string
+  quoteButtonLabel: string
   categories: GalleryCategory[]
   items: PublicGalleryItem[]
 }
@@ -18,6 +19,7 @@ interface StudioGalleryClientProps {
 export default function StudioGalleryClient({
   title,
   tagline,
+  quoteButtonLabel,
   categories,
   items,
 }: StudioGalleryClientProps) {
@@ -34,7 +36,13 @@ export default function StudioGalleryClient({
 
   return (
     <div className="min-w-0 max-w-full overflow-x-hidden">
-      <StudioHero items={items} title={title} tagline={tagline} onSelect={setActive} />
+      <StudioHero
+        items={items}
+        title={title}
+        tagline={tagline}
+        quoteButtonLabel={quoteButtonLabel}
+        onSelect={setActive}
+      />
 
       <div className="max-w-6xl mx-auto px-3 sm:px-6 py-8 sm:py-10 min-w-0">
         <div className="flex flex-wrap gap-2 justify-center mb-8">

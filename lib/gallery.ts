@@ -4,7 +4,7 @@
  */
 
 import { getSheetsClient } from './googleSheets'
-import { getSheetId, getEnvironment } from './config'
+import { getSheetId, getEnvironment, getSheetEnvironmentLabel, isVisibleOnCurrentSurface } from './config'
 import { listOrphanedGalleryBlobs, markGalleryBlobRecoveryDone } from './galleryImage'
 import type { GalleryCategory, GalleryItem, PublicGalleryItem } from './types'
 
@@ -72,7 +72,7 @@ async function ensureTab(title: string, headers: string[]): Promise<void> {
  * Ensure gallery tabs exist and seed default categories when the category tab is empty.
  */
 async function ensureGalleryTabs(): Promise<void> {
-  await ensureTab(CATEGORIES_TAB, ['slug', 'name', 'sortOrder', 'active'])
+  await ensureTab(CATEGORIES_TAB, ['slug', 'name', 'sortOrder', 'active', 'environment'])
   await ensureTab(ITEMS_TAB, [
     'id',
     'categorySlug',
@@ -82,6 +82,7 @@ async function ensureGalleryTabs(): Promise<void> {
     'status',
     'price',
     'createdAt',
+    'environment',
   ])
 
   const sheets = await getSheetsClient()
@@ -97,7 +98,7 @@ async function ensureGalleryTabs(): Promise<void> {
     range: sheetRange(CATEGORIES_TAB, 'A2'),
     valueInputOption: 'RAW',
     requestBody: {
-      values: DEFAULT_CATEGORIES.map((c) => [c.slug, c.name, c.sortOrder, 'TRUE']),
+      values: DEFAULT_CATEGORIES.map((c) => [c.slug, c.name, c.sortOrder, 'TRUE', 'All']),
     },
   })
 }
@@ -114,7 +115,7 @@ export async function fetchGalleryCategories(): Promise<GalleryCategory[]> {
     const spreadsheetId = getSheetId('config')
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId,
-      range: sheetRange(CATEGORIES_TAB, 'A1:D50'),
+      range: sheetRange(CATEGORIES_TAB, 'A1:E50'),
     })
     const rows = response.data.values || []
     if (rows.length < 2) return DEFAULT_CATEGORIES
@@ -122,12 +123,14 @@ export async function fetchGalleryCategories(): Promise<GalleryCategory[]> {
     const categories: GalleryCategory[] = rows.slice(1).flatMap((row) => {
       const slug = String(row[0] || '').trim().toLowerCase()
       if (!slug) return []
+      if (!isVisibleOnCurrentSurface(row[4])) return []
       return [
         {
           slug,
           name: String(row[1] || slug).trim(),
           sortOrder: Number(row[2]) || 0,
           active: row[3] === undefined || row[3] === '' ? true : isTruthyCell(row[3]),
+          environment: String(row[4] || 'All').trim() || 'All',
         },
       ]
     })
@@ -162,6 +165,7 @@ function parseGalleryRow(row: unknown[]): GalleryItem | null {
     status,
     price: Number(String(row[6] || '0').replace(/[$,]/g, '')) || 0,
     createdAt: String(row[7] || '').trim(),
+    environment: String(row[8] || 'All').trim() || 'All',
   }
 }
 
@@ -189,6 +193,7 @@ async function recoverMissingGalleryItems(existing: GalleryItem[]): Promise<Gall
         status: 'Public',
         price: 0,
         createdAt: orphan.createdAt,
+        environment: getSheetEnvironmentLabel(),
       })
     )
   }
@@ -208,14 +213,23 @@ export async function fetchGalleryItems(includeDrafts = false): Promise<GalleryI
     const spreadsheetId = getSheetId('config')
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId,
-      range: sheetRange(ITEMS_TAB, 'A2:H'),
+      range: sheetRange(ITEMS_TAB, 'A2:I'),
     })
     const rows = response.data.values || []
     const environment = getEnvironment()
 
-    const items = rows
+    const allItems = rows
       .map(parseGalleryRow)
       .filter((item): item is GalleryItem => Boolean(item))
+
+    const recovered = await recoverMissingGalleryItems(allItems).catch((error) => {
+      console.error('[gallery] Blob recovery failed:', error)
+      return [] as GalleryItem[]
+    })
+    const combined = recovered.length > 0 ? [...recovered, ...allItems] : allItems
+
+    return combined
+      .filter((item) => isVisibleOnCurrentSurface(item.environment))
       .filter((item) => {
         if (includeDrafts) return true
         if (item.status === 'Draft' && environment === 'production') return false
@@ -223,12 +237,6 @@ export async function fetchGalleryItems(includeDrafts = false): Promise<GalleryI
         return true
       })
       .reverse()
-
-    const recovered = await recoverMissingGalleryItems(items).catch((error) => {
-      console.error('[gallery] Blob recovery failed:', error)
-      return [] as GalleryItem[]
-    })
-    return recovered.length > 0 ? [...recovered, ...items] : items
   } catch (error) {
     console.error('[gallery] Failed to fetch items:', error)
     return []
@@ -271,6 +279,7 @@ export async function createGalleryItem(input: CreateGalleryItemInput): Promise<
   const sheets = await getSheetsClient()
   const spreadsheetId = getSheetId('config')
   const id = `g-${Date.now().toString(36)}`
+  const environment = getSheetEnvironmentLabel()
   const createdAt = new Date().toISOString()
 
   await sheets.spreadsheets.values.append({
@@ -287,6 +296,7 @@ export async function createGalleryItem(input: CreateGalleryItemInput): Promise<
         input.status,
         input.price || 0,
         createdAt,
+        environment,
       ]],
     },
   })
@@ -300,6 +310,7 @@ export async function createGalleryItem(input: CreateGalleryItemInput): Promise<
     status: input.status,
     price: input.price || 0,
     createdAt,
+    environment,
   }
 }
 
@@ -325,7 +336,7 @@ export async function updateGalleryItem(input: UpdateGalleryItemInput): Promise<
   const spreadsheetId = getSheetId('config')
   const response = await sheets.spreadsheets.values.get({
     spreadsheetId,
-    range: sheetRange(ITEMS_TAB, 'A2:H'),
+    range: sheetRange(ITEMS_TAB, 'A2:I'),
   })
   const rows = response.data.values || []
   const index = rows.findIndex((row) => String(row[0] || '').trim() === input.id)
@@ -346,7 +357,7 @@ export async function updateGalleryItem(input: UpdateGalleryItemInput): Promise<
 
   await sheets.spreadsheets.values.update({
     spreadsheetId,
-    range: sheetRange(ITEMS_TAB, `A${rowNumber}:H${rowNumber}`),
+    range: sheetRange(ITEMS_TAB, `A${rowNumber}:I${rowNumber}`),
     valueInputOption: 'RAW',
     requestBody: {
       values: [[
@@ -358,6 +369,7 @@ export async function updateGalleryItem(input: UpdateGalleryItemInput): Promise<
         next.status,
         next.price || 0,
         next.createdAt,
+        next.environment || 'Preview',
       ]],
     },
   })
@@ -380,6 +392,7 @@ function galleryItemToRow(item: GalleryItem): (string | number)[] {
     item.status,
     item.price || 0,
     item.createdAt,
+    item.environment || getSheetEnvironmentLabel(),
   ]
 }
 
@@ -413,7 +426,7 @@ export async function deleteGalleryItem(id: string): Promise<GalleryItem | null>
   const spreadsheetId = getSheetId('config')
   const response = await sheets.spreadsheets.values.get({
     spreadsheetId,
-    range: sheetRange(ITEMS_TAB, 'A2:H'),
+    range: sheetRange(ITEMS_TAB, 'A2:I'),
   })
   const rows = response.data.values || []
   const index = rows.findIndex((row) => String(row[0] || '').trim() === id)
@@ -455,7 +468,7 @@ export async function restoreGalleryItem(item: GalleryItem): Promise<GalleryItem
   const spreadsheetId = getSheetId('config')
   const response = await sheets.spreadsheets.values.get({
     spreadsheetId,
-    range: sheetRange(ITEMS_TAB, 'A2:H'),
+    range: sheetRange(ITEMS_TAB, 'A2:I'),
   })
   const rows = response.data.values || []
   const exists = rows.some((row) => String(row[0] || '').trim() === item.id)

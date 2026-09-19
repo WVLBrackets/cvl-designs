@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from 'react'
 import Image from 'next/image'
-import { DEFAULT_STUDIO_IMAGE_SRC } from '@/lib/studio'
+import Link from 'next/link'
+import { DEFAULT_STUDIO_IMAGE_SRC, STUDIO_QUOTE_ROUTE } from '@/lib/studio'
 import type { PublicGalleryItem } from '@/lib/types'
 
 const ROTATE_MS = 5000
@@ -12,6 +13,7 @@ interface StudioHeroProps {
   items: PublicGalleryItem[]
   title: string
   tagline: string
+  quoteButtonLabel: string
   onSelect?: (item: PublicGalleryItem) => void
 }
 
@@ -45,7 +47,7 @@ function pickHeroItems(items: PublicGalleryItem[]): PublicGalleryItem[] {
 /**
  * Full-width rotating hero of previous studio work, with pause and previous/next controls.
  */
-export default function StudioHero({ items, title, tagline, onSelect }: StudioHeroProps) {
+export default function StudioHero({ items, title, tagline, quoteButtonLabel, onSelect }: StudioHeroProps) {
   const [slides, setSlides] = useState<PublicGalleryItem[]>(() => items.slice(0, HERO_COUNT))
   const [index, setIndex] = useState(0)
   const [paused, setPaused] = useState(false)
@@ -137,11 +139,16 @@ export default function StudioHero({ items, title, tagline, onSelect }: StudioHe
           ) : null}
         </div>
         <div className="text-center sm:text-left min-w-0 px-1">
-          <p className="text-xs font-semibold uppercase tracking-wide text-pink-600 mb-1">
-            Design Studio
-          </p>
           <h1 className="text-2xl sm:text-4xl font-bold text-gray-900 break-words">{title}</h1>
-          <p className="mt-2 text-base sm:text-lg text-gray-600 break-words">{tagline}</p>
+          {tagline ? <p className="mt-2 text-base sm:text-lg text-gray-600 break-words">{tagline}</p> : null}
+          {quoteButtonLabel ? (
+            <Link
+              href={STUDIO_QUOTE_ROUTE}
+              className="inline-block mt-4 px-5 py-2.5 rounded-lg bg-pink-500 hover:bg-pink-600 text-white font-semibold"
+            >
+              {quoteButtonLabel}
+            </Link>
+          ) : null}
           {current?.caption ? (
             <p className="mt-3 text-gray-700 italic break-words">“{current.caption}”</p>
           ) : (

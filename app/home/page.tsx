@@ -3,7 +3,7 @@
  */
 
 import { fetchStores, fetchConfiguration } from '@/lib/googleSheets'
-import { getStudioHomeContent, STUDIO_ROUTE } from '@/lib/studio'
+import { getStudioHomeContent, isStudioVisibleOnHome, STUDIO_ROUTE } from '@/lib/studio'
 import { StudioHeroBand } from '@/components/studio/StudioPlacements'
 import Image from 'next/image'
 import Link from 'next/link'
@@ -54,6 +54,7 @@ export default async function HomePage({
   const logoSizePx = Number(config.Logo_Size || 80)
   const businessName = (config.BusinessName as string) || 'CVL Designs'
   const studioHome = getStudioHomeContent(config)
+  const showStudio = isStudioVisibleOnHome(config)
 
   return (
     <main className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100">
@@ -99,13 +100,17 @@ export default async function HomePage({
         </div>
       </header>
 
-      <StudioHeroBand
-        href={STUDIO_ROUTE}
-        title={studioHome.title}
-        tagline={studioHome.tagline}
-        imageSrc={studioHome.imageSrc}
-        fallbackImageSrc={studioHome.fallbackImageSrc}
-      />
+      {showStudio ? (
+        <StudioHeroBand
+          href={STUDIO_ROUTE}
+          title={studioHome.title}
+          tagline={studioHome.tagline}
+          buttonLabel={studioHome.buttonLabel}
+          imageSrc={studioHome.leftImageSrc}
+          rightImageSrc={studioHome.rightImageSrc}
+          fallbackImageSrc={studioHome.fallbackImageSrc}
+        />
+      ) : null}
 
       {/* Store Selector */}
       <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
