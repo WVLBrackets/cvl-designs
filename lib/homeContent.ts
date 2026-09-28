@@ -247,7 +247,7 @@ const homeContentSchema = z.object({
 export function defaultHomeContent(): HomeContent {
   return {
     headerTitle: 'CVL Designs',
-    headerLogoSrc: '/images/brand/VL Design Logo.png',
+    headerLogoSrc: '/images/brand/VL Design Logo - Trimmed.png',
     navBalloons: 'Balloons',
     navBalloonsHref: BALLOONS_ROUTE,
     navBanners: 'Banners',
