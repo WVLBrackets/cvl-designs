@@ -6,20 +6,13 @@
 
 import { useState } from 'react'
 import type { ContactInfo } from '@/lib/types'
+import { formatUsPhone, usPhoneDigits } from '@/lib/validation'
 
 interface CustomerInfoFormProps {
   contactInfo: ContactInfo
   onChange: (contactInfo: ContactInfo) => void
   compact?: boolean
   accentColor?: string
-}
-
-function formatPhone(digitsOnly: string): string {
-  const d = digitsOnly.replace(/\D/g, '').slice(0, 10)
-  if (d.length === 0) return ''
-  if (d.length <= 3) return `(${d}`
-  if (d.length <= 6) return `(${d.slice(0, 3)}) ${d.slice(3)}`
-  return `(${d.slice(0, 3)}) ${d.slice(3, 6)}-${d.slice(6)}`
 }
 
 function isValidEmail(email: string): boolean {
@@ -30,7 +23,7 @@ function isValidEmail(email: string): boolean {
  * Helper function to validate contact info
  */
 export function isContactInfoValid(contactInfo: ContactInfo): boolean {
-  const phoneDigits = contactInfo.phoneNumber.replace(/\D/g, '')
+  const phoneDigits = usPhoneDigits(contactInfo.phoneNumber)
   const phoneValid = phoneDigits.length === 10
   const emailValid = contactInfo.email.length > 0 && isValidEmail(contactInfo.email)
   const firstNameValid = contactInfo.parentFirstName.trim().length > 0
@@ -43,7 +36,7 @@ export default function CustomerInfoForm({ contactInfo, onChange, compact = fals
   const [phoneTouched, setPhoneTouched] = useState(false)
   const [emailTouched, setEmailTouched] = useState(false)
 
-  const phoneDigits = contactInfo.phoneNumber.replace(/\D/g, '')
+  const phoneDigits = usPhoneDigits(contactInfo.phoneNumber)
   const phoneValid = phoneDigits.length === 10
   const emailValid = contactInfo.email.length === 0 ? false : isValidEmail(contactInfo.email)
 
@@ -81,8 +74,8 @@ export default function CustomerInfoForm({ contactInfo, onChange, compact = fals
           <input
             type="tel"
             required
-            value={formatPhone(contactInfo.phoneNumber)}
-            onChange={(e) => onChange({ ...contactInfo, phoneNumber: e.target.value })}
+            value={formatUsPhone(contactInfo.phoneNumber)}
+            onChange={(e) => onChange({ ...contactInfo, phoneNumber: formatUsPhone(e.target.value) })}
             onBlur={() => setPhoneTouched(true)}
             className={phoneInputClass.replace('w-full', 'w-full md:w-52')}
             placeholder="Phone"
@@ -167,8 +160,8 @@ export default function CustomerInfoForm({ contactInfo, onChange, compact = fals
           <input
             type="tel"
             required
-            value={formatPhone(contactInfo.phoneNumber)}
-            onChange={(e) => onChange({ ...contactInfo, phoneNumber: e.target.value })}
+            value={formatUsPhone(contactInfo.phoneNumber)}
+            onChange={(e) => onChange({ ...contactInfo, phoneNumber: formatUsPhone(e.target.value) })}
             onBlur={() => setPhoneTouched(true)}
             className={phoneInputClass}
             placeholder="(555) 123-4567"

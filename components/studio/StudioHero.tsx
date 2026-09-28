@@ -1,20 +1,23 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import Image from 'next/image'
 import Link from 'next/link'
+import EditableText from '@/components/home/EditableText'
+import ShowToggle from '@/components/home/ShowToggle'
+import HeroSlideshow, { type HeroSlide } from '@/components/home/HeroSlideshow'
+import { patchHomeField, useHomeAdmin } from '@/components/home/HomeAdminContext'
 import { DEFAULT_STUDIO_IMAGE_SRC, STUDIO_QUOTE_ROUTE } from '@/lib/studio'
+import { HOME_LABELS } from '@/lib/homeVocabulary'
+import type { HomeContent } from '@/lib/homeContent'
 import type { PublicGalleryItem } from '@/lib/types'
 
-const ROTATE_MS = 5000
 const HERO_COUNT = 8
 
 interface StudioHeroProps {
   items: PublicGalleryItem[]
-  title: string
-  tagline: string
-  quoteButtonLabel: string
-  onSelect?: (item: PublicGalleryItem) => void
+  content: HomeContent
+  onSelect?: (item: PublicGalleryItem, playlist: PublicGalleryItem[]) => void
+  hold?: boolean
 }
 
 /**
@@ -34,140 +37,119 @@ function shuffle<T>(list: T[]): T[] {
 }
 
 /**
- * Pick the rotating hero set: featured items first, otherwise a random public subset.
+ * Studio hero slides: items marked Studio Hero, otherwise a public subset.
+ * First paint uses a stable order so server HTML matches hydration.
  *
  * @param items - Public gallery items
+ * @param randomize - When true, shuffle after the client has mounted
  */
-function pickHeroItems(items: PublicGalleryItem[]): PublicGalleryItem[] {
-  const featured = items.filter((item) => item.featured)
-  const pool = featured.length > 0 ? featured : items
-  return shuffle(pool).slice(0, HERO_COUNT)
+function pickStudioHeroItems(items: PublicGalleryItem[], randomize: boolean): PublicGalleryItem[] {
+  const marked = items.filter((item) => item.featured)
+  const pool = marked.length > 0 ? marked : items
+  const ordered = randomize ? shuffle(pool) : [...pool]
+  return ordered.slice(0, HERO_COUNT)
 }
 
 /**
- * Full-width rotating hero of previous studio work, with pause and previous/next controls.
+ * Full-width rotating hero of studio work, with pause and previous/next when needed.
  */
-export default function StudioHero({ items, title, tagline, quoteButtonLabel, onSelect }: StudioHeroProps) {
-  const [slides, setSlides] = useState<PublicGalleryItem[]>(() => items.slice(0, HERO_COUNT))
-  const [index, setIndex] = useState(0)
-  const [paused, setPaused] = useState(false)
+export default function StudioHero({ items, content, onSelect, hold = false }: StudioHeroProps) {
+  const admin = useHomeAdmin()
+  const [slides, setSlides] = useState<PublicGalleryItem[]>(() => pickStudioHeroItems(items, false))
+  const showQuote = admin || content.showStudioQuoteCta
+  const delayMs = Math.max(1, content.heroDelaySeconds || 5) * 1000
 
   useEffect(() => {
-    setSlides(pickHeroItems(items))
-    setIndex(0)
+    setSlides(pickStudioHeroItems(items, true))
   }, [items])
 
-  useEffect(() => {
-    if (paused || slides.length < 2) return undefined
-    const timer = window.setTimeout(() => {
-      setIndex((current) => (current + 1) % slides.length)
-    }, ROTATE_MS)
-    return () => window.clearTimeout(timer)
-  }, [paused, slides.length, index])
+  const heroSlides: HeroSlide[] =
+    slides.length > 0
+      ? slides.map((item) => ({
+          id: item.id,
+          src: item.imageUrl,
+          alt: item.caption || content.studioTitle,
+          playFull: item.heroVideoPlay === 'full',
+        }))
+      : [{ id: 'fallback', src: DEFAULT_STUDIO_IMAGE_SRC, alt: content.studioTitle }]
 
-  /**
-   * Move the hero by one slide, wrapping at both ends.
-   *
-   * @param delta - `-1` for previous, `1` for next
-   */
-  function go(delta: number) {
-    if (slides.length < 2) return
-    setIndex((current) => (current + delta + slides.length) % slides.length)
-  }
-
-  const current = slides[index]
-  const imageSrc = current?.imageUrl || DEFAULT_STUDIO_IMAGE_SRC
-  const caption = current?.caption || title
-  const showControls = slides.length > 1
+  const [caption, setCaption] = useState(slides[0]?.caption || '')
 
   return (
-    <section className="relative bg-gradient-to-r from-pink-100 via-rose-50 to-sky-100 border-y border-pink-200 overflow-hidden">
-      <div className="max-w-6xl mx-auto px-3 sm:px-6 py-4 sm:py-8 grid sm:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)] gap-4 sm:gap-6 items-center min-w-0">
-        <div className="relative w-full min-w-0 max-w-full aspect-[4/3] sm:aspect-[16/10] rounded-xl overflow-hidden bg-white shadow-md">
-          <Image
-            src={imageSrc}
-            alt={caption}
-            fill
-            className="object-cover"
-            sizes="(max-width: 768px) 100%, 60vw"
-            priority
+    <section className="relative overflow-hidden border-y home-border home-bg-2">
+      <div className="mx-auto grid max-w-6xl items-center gap-4 px-4 py-8 sm:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)] sm:gap-8 sm:px-6 lg:py-12">
+        <HeroSlideshow
+          slides={heroSlides}
+          delayMs={delayMs}
+          sizes="(max-width: 768px) 100vw, 60vw"
+          hold={hold}
+          onSelect={
+            onSelect
+              ? (slide) => {
+                  const item = slides.find((entry) => entry.id === slide.id)
+                  if (item) onSelect(item, slides)
+                }
+              : undefined
+          }
+          onSlideChange={(slide) => {
+            const item = slides.find((entry) => entry.id === slide.id)
+            setCaption(item?.caption || '')
+          }}
+        />
+        <div className="flex min-w-0 flex-col gap-3 px-1 text-center sm:text-left">
+          <EditableText
+            field="studioKicker"
+            value={content.studioKicker}
+            label={HOME_LABELS.studioKicker}
+            as="p"
+            className="text-xs font-semibold uppercase tracking-[0.2em] home-accent"
           />
-          {current && onSelect ? (
-            <button
-              type="button"
-              className="absolute inset-0 z-[1]"
-              onClick={() => onSelect(current)}
-              aria-label={`View ${caption}`}
-            />
-          ) : null}
-          {showControls ? (
-            <>
-              <button
-                type="button"
-                className="absolute left-2 top-1/2 z-10 -translate-y-1/2 h-11 w-11 rounded-full bg-black/60 text-white text-2xl leading-none"
-                aria-label="Previous photo"
-                onClick={() => go(-1)}
-              >
-                ‹
-              </button>
-              <button
-                type="button"
-                className="absolute right-2 top-1/2 z-10 -translate-y-1/2 h-11 w-11 rounded-full bg-black/60 text-white text-2xl leading-none"
-                aria-label="Next photo"
-                onClick={() => go(1)}
-              >
-                ›
-              </button>
-              <button
-                type="button"
-                className="absolute bottom-2 left-1/2 z-10 -translate-x-1/2 h-11 w-11 rounded-full bg-black/60 text-white flex items-center justify-center"
-                aria-label={paused ? 'Play slideshow' : 'Pause slideshow'}
-                aria-pressed={paused}
-                onClick={() => setPaused((value) => !value)}
-              >
-                {paused ? (
-                  <svg viewBox="0 0 24 24" className="h-5 w-5 fill-current" aria-hidden="true">
-                    <path d="M8 5v14l11-7z" />
-                  </svg>
-                ) : (
-                  <svg viewBox="0 0 24 24" className="h-5 w-5 fill-current" aria-hidden="true">
-                    <path d="M6 5h4v14H6zm8 0h4v14h-4z" />
-                  </svg>
-                )}
-              </button>
-            </>
-          ) : null}
-        </div>
-        <div className="text-center sm:text-left min-w-0 px-1">
-          <h1 className="text-2xl sm:text-4xl font-bold text-gray-900 break-words">{title}</h1>
-          {tagline ? <p className="mt-2 text-base sm:text-lg text-gray-600 break-words">{tagline}</p> : null}
-          {quoteButtonLabel ? (
-            <Link
-              href={STUDIO_QUOTE_ROUTE}
-              className="inline-block mt-4 px-5 py-2.5 rounded-lg bg-pink-500 hover:bg-pink-600 text-white font-semibold"
-            >
-              {quoteButtonLabel}
-            </Link>
-          ) : null}
-          {current?.caption ? (
-            <p className="mt-3 text-gray-700 italic break-words">“{current.caption}”</p>
-          ) : (
-            <p className="mt-3 text-gray-500">Gallery coming soon — check back for recent work.</p>
-          )}
-          {showControls ? (
-            <div className="mt-4 flex justify-center sm:justify-start gap-2 flex-wrap">
-              {slides.map((slide, i) => (
-                <button
-                  key={slide.id}
-                  type="button"
-                  aria-label={`Show photo ${i + 1}`}
-                  aria-current={i === index}
-                  onClick={() => setIndex(i)}
-                  className={`h-2.5 w-2.5 rounded-full ${i === index ? 'bg-pink-500' : 'bg-pink-200'}`}
+          <EditableText
+            field="studioTitle"
+            value={content.studioTitle}
+            label={HOME_LABELS.studioTitle}
+            as="h1"
+            className="font-serif text-3xl font-semibold leading-tight home-text sm:text-4xl"
+          />
+          <EditableText
+            field="studioTagline"
+            value={content.studioTagline}
+            label={HOME_LABELS.studioTagline}
+            as="p"
+            multiline
+            className="text-base home-text-muted sm:text-lg"
+          />
+          {showQuote ? (
+            <div className={admin && !content.showStudioQuoteCta ? 'opacity-50' : ''}>
+              <ShowToggle
+                checked={content.showStudioQuoteCta}
+                onChange={(checked) =>
+                  admin && patchHomeField(admin.setContent, 'showStudioQuoteCta', checked)
+                }
+              />
+              {admin ? (
+                <EditableText
+                  field="studioQuoteCta"
+                  value={content.studioQuoteCta}
+                  label={HOME_LABELS.studioQuoteCta}
+                  onDark
+                  className="inline-flex min-h-11 items-center justify-center rounded-full home-accent-bg px-5 py-2 text-sm font-semibold text-white"
                 />
-              ))}
+              ) : content.studioQuoteCta.trim() ? (
+                <Link
+                  href={STUDIO_QUOTE_ROUTE}
+                  className="inline-flex min-h-11 items-center justify-center rounded-full home-accent-bg px-5 py-2 text-sm font-semibold text-white hover:opacity-90"
+                >
+                  {content.studioQuoteCta}
+                </Link>
+              ) : null}
             </div>
           ) : null}
+          {caption ? (
+            <p className="italic home-text-muted">“{caption}”</p>
+          ) : (
+            <p className="home-text-muted">Gallery coming soon — check back for recent work.</p>
+          )}
         </div>
       </div>
     </section>

@@ -63,3 +63,50 @@ body {
   }
 }
 
+/* Brand homepage wrapper. Apparel pages should not use this class. */
+.home-brand {
+  --home-bg: #f4f1eb;
+  --home-bg-2: #ffffff;
+  --home-accent: #b47e7e;
+  --home-text: #000000;
+  background-color: var(--home-bg);
+  color: var(--home-text);
+}
+
+.home-bg {
+  background-color: var(--home-bg);
+}
+
+.home-bg-2 {
+  background-color: var(--home-bg-2);
+}
+
+.home-text {
+  color: var(--home-text);
+}
+
+.home-text-muted {
+  color: color-mix(in srgb, var(--home-text) 75%, transparent);
+}
+
+.home-accent {
+  color: var(--home-accent);
+}
+
+.home-accent-bg {
+  background-color: var(--home-accent);
+}
+
+.home-accent-border {
+  border-color: var(--home-accent);
+}
+
+.home-border {
+  border-color: color-mix(in srgb, var(--home-text) 18%, transparent);
+}
+
+.home-inverse {
+  background-color: var(--home-text);
+  color: var(--home-bg);
+}
+

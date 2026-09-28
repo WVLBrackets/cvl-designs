@@ -6,12 +6,15 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "db:push": "dotenv -e .env.local -- drizzle-kit push"
   },
   "dependencies": {
+    "@neondatabase/serverless": "^1.1.0",
     "@types/pdfkit": "^0.17.3",
     "@vercel/blob": "^2.8.0",
     "dotenv": "^17.2.3",
+    "drizzle-orm": "^0.45.3",
     "googleapis": "^164.1.0",
     "next": "14.2.35",
     "nodemailer": "^7.0.10",
@@ -26,6 +29,8 @@
     "@types/react": "^18",
     "@types/react-dom": "^18",
     "autoprefixer": "^10.4.20",
+    "dotenv-cli": "^11.0.0",
+    "drizzle-kit": "^0.31.11",
     "eslint": "^8",
     "eslint-config-next": "^14.2.33",
     "postcss": "^8",

@@ -1,200 +1,55 @@
 /**
- * Home Page - Store Selector
+ * Brand homepage — celebrations and team stores front door.
  */
 
-import { fetchStores, fetchConfiguration } from '@/lib/googleSheets'
-import { getStudioHomeContent, isStudioVisibleOnHome, STUDIO_ROUTE } from '@/lib/studio'
-import { StudioHeroBand } from '@/components/studio/StudioPlacements'
-import Image from 'next/image'
-import Link from 'next/link'
+import { fetchConfiguration } from '@/lib/googleSheets'
+import { fetchGalleryItems, toPublicGalleryItems } from '@/lib/gallery'
+import AboutBand from '@/components/home/AboutBand'
+import FinalCta from '@/components/home/FinalCta'
+import HomeHero from '@/components/home/HomeHero'
+import Offerings from '@/components/home/Offerings'
+import PathsGrid from '@/components/home/PathsGrid'
+import RecentWork from '@/components/home/RecentWork'
+import MarketingChrome from '@/components/home/MarketingChrome'
+import { mergeHomeContent } from '@/lib/homeContent'
+import { hasAdminSession } from '@/lib/adminSession'
+import type { Metadata } from 'next'
 
-export default async function HomePage({
-  searchParams,
-}: {
-  searchParams: { error?: string }
-}) {
-  let stores: any[] = []
-  let config: any = {}
-  
+export const metadata: Metadata = {
+  title: 'CVL Designs | Balloons, Banners & Team Stores',
+  description:
+    'Handmade balloon designs, painted banners, and custom team apparel by Caryn Vander Laan Designs.',
+}
+
+export default async function HomePage() {
+  let content = mergeHomeContent({})
+  let galleryItems: ReturnType<typeof toPublicGalleryItems> = []
+
   try {
-    [stores, config] = await Promise.all([
-      fetchStores(),
-      fetchConfiguration(),
-    ])
+    const config = await fetchConfiguration()
+    content = mergeHomeContent(config)
   } catch (error) {
-    console.error('Error fetching data:', error)
-    // Return error page
-    return (
-      <main className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100 flex items-center justify-center">
-        <div className="bg-white rounded-lg shadow-lg p-8 max-w-md">
-          <h1 className="text-2xl font-bold text-red-600 mb-4">Configuration Error</h1>
-          <p className="text-gray-700 mb-4">Unable to load store configuration. Please check:</p>
-          <ul className="list-disc list-inside text-sm text-gray-600 space-y-2">
-            <li>Google Sheets environment variables are set</li>
-            <li>Service account has access to sheets</li>
-            <li>Sheet IDs are correct</li>
-          </ul>
-          <p className="text-xs text-gray-500 mt-4">Error: {error instanceof Error ? error.message : 'Unknown error'}</p>
-        </div>
-      </main>
-    )
+    console.error('Error fetching homepage configuration:', error)
   }
 
-  const getCfgStr = (key: string) => (typeof config[key] === 'string' ? (config[key] as string).trim() : '')
-  const headerTitle = getCfgStr('Header_Title')
-  const headerSubtitle = getCfgStr('Header_Subtitle')
-  const headerLogo = getCfgStr('Header_Logo')
-  const homePageTitle = getCfgStr('Home_Page_Title') || 'Select Your Team Store'
-  const homePageInstruction = getCfgStr('Home_Page_Instruction') || 'Choose your team to view custom apparel and place orders'
-  const headerLogoSrc = headerLogo
-    ? (headerLogo.startsWith('/') || headerLogo.startsWith('http')
-        ? headerLogo
-        : `/images/brand/${headerLogo}`)
-    : '/images/brand/VL Design Logo.png'
-  const logoSizePx = Number(config.Logo_Size || 80)
-  const businessName = (config.BusinessName as string) || 'CVL Designs'
-  const studioHome = getStudioHomeContent(config)
-  const showStudio = isStudioVisibleOnHome(config)
+  try {
+    galleryItems = toPublicGalleryItems(await fetchGalleryItems(false))
+  } catch (error) {
+    console.error('Error fetching homepage gallery:', error)
+  }
 
   return (
-    <main className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100">
-      {/* Header */}
-      <header className="bg-white shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
-          {/* Mobile Layout: Stacked and Centered (matches storefront) */}
-          <div className="sm:hidden flex flex-col items-center gap-3 text-center">
-            {/* Row 1: Header Title at top */}
-            {headerTitle ? (<h1 className="text-xl font-bold text-gray-900">{headerTitle}</h1>) : null}
-            
-            {/* Row 2: Header Logo - Same size as store logos (80px) */}
-            <div className="relative flex-shrink-0" style={{ width: '80px', height: '80px' }}>
-              <Image
-                src={headerLogoSrc}
-                alt={`${businessName} Logo`}
-                fill
-                className="object-contain"
-              />
-            </div>
-            
-            {/* Row 3: Header Subtitle in italics */}
-            {headerSubtitle ? (<p className="text-sm text-gray-600 italic">{headerSubtitle}</p>) : null}
-          </div>
-
-          {/* Desktop Layout: Horizontal (unchanged) */}
-          <div className="hidden sm:flex flex-row items-center justify-center gap-4">
-            <div className="flex items-center gap-4">
-              <div className="relative flex-shrink-0" style={{ width: `${logoSizePx}px`, height: `${logoSizePx}px` }}>
-                <Image
-                  src={headerLogoSrc}
-                  alt={`${businessName} Logo`}
-                  fill
-                  className="object-contain"
-                />
-              </div>
-              <div className="text-center sm:text-left">
-                {headerTitle ? (<h1 className="text-3xl font-bold text-gray-900">{headerTitle}</h1>) : null}
-                {headerSubtitle ? (<p className="text-gray-600">{headerSubtitle}</p>) : null}
-              </div>
-            </div>
-          </div>
-        </div>
-      </header>
-
-      {showStudio ? (
-        <StudioHeroBand
-          href={STUDIO_ROUTE}
-          title={studioHome.title}
-          tagline={studioHome.tagline}
-          buttonLabel={studioHome.buttonLabel}
-          imageSrc={studioHome.leftImageSrc}
-          rightImageSrc={studioHome.rightImageSrc}
-          fallbackImageSrc={studioHome.fallbackImageSrc}
-        />
-      ) : null}
-
-      {/* Store Selector */}
-      <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <div className="bg-white rounded-lg shadow-lg p-8">
-          {/* Error message banner */}
-          {searchParams.error && (
-            <div className="mb-6 rounded-lg p-4 bg-red-50 border-2 border-red-200">
-              <p className="text-red-800 font-semibold text-center">{searchParams.error}</p>
-            </div>
-          )}
-
-          <div className="text-center mb-4">
-            <h2 className="text-2xl font-bold text-gray-900">{homePageTitle}</h2>
-          </div>
-          <p className="text-gray-600 mb-8 text-center">{homePageInstruction}</p>
-          
-          {/* 2x2 Grid of Store Buttons (75% size) */}
-          <div className="grid grid-cols-2 gap-6 max-w-lg mx-auto">
-            {stores.map((store) => {
-              const slug = store.slug || ''
-              const displayName = store['Display Name'] || store.DisplayName || slug
-              const primaryColor = store['Primary Color'] || '#3b82f6'
-              const accentColor = store['Accent Color'] || '#1e40af'
-              const headerLogo = store['Header Logo'] || ''
-              const logoSrc = headerLogo
-                ? (headerLogo.startsWith('/') || headerLogo.startsWith('http')
-                    ? headerLogo
-                    : `/images/brand/${headerLogo}`)
-                : '/images/brand/VL Design Logo.png'
-              
-              if (!slug || slug.toLowerCase() === 'all') return null
-              
-              return (
-                <Link
-                  key={slug}
-                  href={`/?store=${slug}`}
-                  className="flex flex-col items-center group"
-                >
-                  {/* Square Button with Logo */}
-                  <div 
-                    className="w-full aspect-square rounded-lg border-4 transition-all hover:scale-105 hover:shadow-xl bg-white flex items-center justify-center p-6"
-                    style={{
-                      borderColor: accentColor,
-                    }}
-                  >
-                    <div className="relative w-full h-full">
-                      <Image
-                        src={logoSrc}
-                        alt={`${displayName} Logo`}
-                        fill
-                        className="object-contain"
-                      />
-                    </div>
-                  </div>
-                  
-                  {/* Display Name Below Button */}
-                  <p 
-                    className="mt-3 text-center font-semibold text-lg"
-                    style={{ color: primaryColor }}
-                  >
-                    {displayName}
-                  </p>
-                </Link>
-              )
-            })}
-          </div>
-
-          {stores.length === 0 && (
-            <p className="text-center text-gray-500 py-8">No stores available at this time.</p>
-          )}
-        </div>
-      </div>
-
-      {/* Footer */}
-      <footer className="bg-white border-t mt-16">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <p className="text-center text-gray-500 text-sm">
-            {config.Footer || `© ${new Date().getFullYear()} ${businessName}. All rights reserved.`}
-          </p>
-        </div>
-      </footer>
-    </main>
+    <MarketingChrome content={content} showAdminLink={hasAdminSession()}>
+      <main id="main-content">
+        <HomeHero content={content} galleryItems={galleryItems} />
+        <PathsGrid content={content} />
+        <Offerings content={content} />
+        <RecentWork items={galleryItems} content={content} />
+        <AboutBand content={content} />
+        <FinalCta content={content} />
+      </main>
+    </MarketingChrome>
   )
 }
 
-export const revalidate = 300
-
+export const revalidate = 60

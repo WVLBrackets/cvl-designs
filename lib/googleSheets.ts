@@ -255,7 +255,7 @@ export async function fetchConfiguration(): Promise<SiteConfiguration> {
     
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId,
-      range: 'A2:C100', // Attribute, Production Value, Preview Value
+      range: 'A2:C400', // Attribute, Production Value, Preview Value
     })
     
     const rows = response.data.values || []
@@ -286,6 +286,52 @@ export async function fetchConfiguration(): Promise<SiteConfiguration> {
     console.error('Error fetching configuration:', error)
     return {}
   }
+}
+
+/**
+ * Create or update one Config-sheet attribute for the current surface.
+ * Production writes column B; Preview/local write column C.
+ *
+ * @param attribute - Config key in column A
+ * @param value - String value to persist
+ */
+export async function upsertConfigValue(attribute: string, value: string): Promise<void> {
+  const sheets = await getSheetsClient()
+  const spreadsheetId = getSheetId('config')
+  const useProduction = isProductionSurface()
+  const response = await sheets.spreadsheets.values.get({
+    spreadsheetId,
+    range: 'A1:C400',
+  })
+  const rows = response.data.values || []
+  let foundIndex = -1
+  for (let i = 1; i < rows.length; i += 1) {
+    if (String(rows[i]?.[0] || '').trim() === attribute) {
+      foundIndex = i
+      break
+    }
+  }
+
+  if (foundIndex >= 0) {
+    const rowNumber = foundIndex + 1
+    const col = useProduction ? 'B' : 'C'
+    await sheets.spreadsheets.values.update({
+      spreadsheetId,
+      range: `${col}${rowNumber}`,
+      valueInputOption: 'RAW',
+      requestBody: { values: [[value]] },
+    })
+    return
+  }
+
+  await sheets.spreadsheets.values.append({
+    spreadsheetId,
+    range: 'A:C',
+    valueInputOption: 'RAW',
+    requestBody: {
+      values: useProduction ? [[attribute, value, '']] : [[attribute, '', value]],
+    },
+  })
 }
 
 /**

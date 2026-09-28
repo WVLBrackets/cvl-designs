@@ -1,30 +1,43 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import Image from 'next/image'
 import StudioHero from './StudioHero'
+import GalleryLightbox, { type GalleryLightboxItem } from '@/components/studio/GalleryLightbox'
+import GalleryMedia from '@/components/studio/GalleryMedia'
+import EditableText from '@/components/home/EditableText'
+import EditableChip from '@/components/studio/EditableChip'
+import { useHomeAdmin, patchHomeField } from '@/components/home/HomeAdminContext'
+import { HOME_LABELS } from '@/lib/homeVocabulary'
+import type { HomeContent } from '@/lib/homeContent'
 import type { GalleryCategory, PublicGalleryItem } from '@/lib/types'
 
 interface StudioGalleryClientProps {
-  title: string
-  tagline: string
-  quoteButtonLabel: string
+  content: HomeContent
   categories: GalleryCategory[]
   items: PublicGalleryItem[]
+  initialCategory?: string
+  onCategoriesChange?: (categories: GalleryCategory[]) => void
 }
 
 /**
- * Public studio gallery: rotating hero, category chips, grid, and lightbox.
+ * Public studio gallery, or admin chips + hero without the filterable grid.
  */
 export default function StudioGalleryClient({
-  title,
-  tagline,
-  quoteButtonLabel,
+  content,
   categories,
   items,
+  initialCategory = 'all',
+  onCategoriesChange,
 }: StudioGalleryClientProps) {
-  const [filter, setFilter] = useState('all')
-  const [active, setActive] = useState<PublicGalleryItem | null>(null)
+  const admin = useHomeAdmin()
+  const [filter, setFilter] = useState(() => {
+    const slug = initialCategory.trim().toLowerCase()
+    if (!slug || slug === 'all') return 'all'
+    return categories.some((category) => category.slug === slug) ? slug : 'all'
+  })
+  const [lightbox, setLightbox] = useState<{ items: GalleryLightboxItem[]; startId: string } | null>(
+    null
+  )
 
   const visible = useMemo(
     () => (filter === 'all' ? items : items.filter((item) => item.categorySlug === filter)),
@@ -34,72 +47,151 @@ export default function StudioGalleryClient({
   const categoryName = (slug: string) =>
     categories.find((c) => c.slug === slug)?.name || slug
 
+  /**
+   * Build lightbox fields for a public gallery item.
+   *
+   * @param item - Gallery piece
+   */
+  function toLightboxItem(item: PublicGalleryItem): GalleryLightboxItem {
+    return {
+      id: item.id,
+      src: item.imageUrl,
+      alt: item.caption || 'Gallery piece',
+      caption: item.caption,
+      categoryName: categoryName(item.categorySlug),
+    }
+  }
+
+  /**
+   * Open the lightbox on a piece, using the given playlist for previous/next.
+   *
+   * @param item - Item to show first
+   * @param playlist - Items the arrows step through
+   */
+  function openLightbox(item: PublicGalleryItem, playlist: PublicGalleryItem[]) {
+    const list = playlist.length > 0 ? playlist : [item]
+    setLightbox({
+      items: list.map(toLightboxItem),
+      startId: item.id,
+    })
+  }
+
+  const chipClass = (selected: boolean) =>
+    selected
+      ? 'home-accent-bg border-transparent text-white'
+      : 'home-bg-2 home-text border home-border hover:opacity-90'
+
+  /**
+   * Persist a category display name so gallery card titles stay in sync.
+   */
+  async function renameCategory(slug: string, name: string) {
+    const nextName = name.trim()
+    if (!nextName) return
+    const previous = categories
+    onCategoriesChange?.(
+      categories.map((category) => (category.slug === slug ? { ...category, name: nextName } : category))
+    )
+    try {
+      const response = await fetch('/api/studio/admin/categories', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ slug, name: nextName }),
+      })
+      const result = await response.json()
+      if (!response.ok || !result.success) {
+        onCategoriesChange?.(previous)
+      }
+    } catch {
+      onCategoriesChange?.(previous)
+    }
+  }
+
   return (
     <div className="min-w-0 max-w-full overflow-x-hidden">
       <StudioHero
         items={items}
-        title={title}
-        tagline={tagline}
-        quoteButtonLabel={quoteButtonLabel}
-        onSelect={setActive}
+        content={content}
+        onSelect={admin ? undefined : openLightbox}
+        hold={Boolean(lightbox)}
       />
 
-      <div className="max-w-6xl mx-auto px-3 sm:px-6 py-8 sm:py-10 min-w-0">
-        <div className="flex flex-wrap gap-2 justify-center mb-8">
-          <button
-            type="button"
-            onClick={() => setFilter('all')}
-            className={`px-4 py-2 rounded-full text-sm font-semibold border ${
-              filter === 'all'
-                ? 'bg-pink-500 text-white border-pink-500'
-                : 'bg-white text-gray-700 border-gray-300 hover:border-pink-300'
-            }`}
-          >
-            All
-          </button>
-          {categories.map((category) => (
-            <button
-              key={category.slug}
-              type="button"
-              onClick={() => setFilter(category.slug)}
-              className={`px-4 py-2 rounded-full text-sm font-semibold border ${
-                filter === category.slug
-                  ? 'bg-pink-500 text-white border-pink-500'
-                  : 'bg-white text-gray-700 border-gray-300 hover:border-pink-300'
-              }`}
-            >
-              {category.name}
-            </button>
-          ))}
+      <div className={`mx-auto max-w-6xl min-w-0 px-4 sm:px-6 ${admin ? 'py-6' : 'py-8 sm:py-10'}`}>
+        <div className="mb-8 flex flex-wrap justify-center gap-2">
+          {admin ? (
+            <>
+              <EditableChip
+                label={HOME_LABELS.studioAllLabel}
+                value={content.studioAllLabel}
+                className="home-accent-bg border-transparent text-white"
+                onCommit={(value) => {
+                  if (admin && value.trim()) {
+                    patchHomeField(admin.setContent, 'studioAllLabel', value.trim())
+                  }
+                }}
+              />
+              {categories.map((category) => (
+                <EditableChip
+                  key={category.slug}
+                  label={`${category.slug} filter`}
+                  value={category.name}
+                  onCommit={(value) => renameCategory(category.slug, value)}
+                />
+              ))}
+            </>
+          ) : (
+            <>
+              <button
+                type="button"
+                onClick={() => setFilter('all')}
+                className={`rounded-full px-4 py-2 text-sm font-semibold ${chipClass(filter === 'all')}`}
+              >
+                {content.studioAllLabel.trim() || 'All'}
+              </button>
+              {categories.map((category) => (
+                <button
+                  key={category.slug}
+                  type="button"
+                  onClick={() => setFilter(category.slug)}
+                  className={`rounded-full px-4 py-2 text-sm font-semibold ${chipClass(filter === category.slug)}`}
+                >
+                  {category.name}
+                </button>
+              ))}
+            </>
+          )}
         </div>
 
-        {visible.length === 0 ? (
-          <p className="text-center text-gray-500 py-12">
-            No pieces in this category yet. Caryn’s latest work will show up here.
-          </p>
+        {admin ? null : visible.length === 0 ? (
+          <EditableText
+            field="studioEmpty"
+            value={content.studioEmpty}
+            label={HOME_LABELS.studioEmpty}
+            as="p"
+            multiline
+            className="rounded-2xl border border-dashed home-border px-5 py-12 text-center text-sm home-text-muted"
+          />
         ) : (
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-6">
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-3 md:gap-6">
             {visible.map((item) => (
               <button
                 key={item.id}
                 type="button"
-                onClick={() => setActive(item)}
-                className="group text-left bg-white rounded-lg shadow-sm overflow-hidden hover:shadow-lg transition-shadow min-w-0"
+                onClick={() => openLightbox(item, visible)}
+                className="group min-w-0 overflow-hidden rounded-2xl border home-border home-bg-2 text-left shadow-sm transition hover:shadow-md"
               >
-                <div className="relative aspect-square bg-gray-100">
-                  <Image
+                <div className="relative aspect-square">
+                  <GalleryMedia
                     src={item.imageUrl}
                     alt={item.caption || 'Gallery piece'}
-                    fill
-                    className="object-cover group-hover:scale-[1.02] transition-transform"
                     sizes="(max-width: 768px) 50vw, 33vw"
+                    mode="thumb"
                   />
                 </div>
-                <div className="p-3 min-w-0">
-                  <p className="text-xs uppercase tracking-wide text-pink-600 font-semibold">
+                <div className="min-w-0 p-3">
+                  <p className="text-xs font-semibold uppercase tracking-wide home-accent">
                     {categoryName(item.categorySlug)}
                   </p>
-                  <p className="mt-1 text-sm text-gray-800 line-clamp-2 break-words">{item.caption}</p>
+                  <p className="mt-1 line-clamp-2 break-words text-sm home-text">{item.caption}</p>
                 </div>
               </button>
             ))}
@@ -107,42 +199,12 @@ export default function StudioGalleryClient({
         )}
       </div>
 
-      {active ? (
-        <div
-          className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-3 overflow-y-auto"
-          onClick={() => setActive(null)}
-          role="dialog"
-          aria-modal="true"
-          aria-label={active.caption || 'Gallery image'}
-        >
-          <div
-            className="bg-white rounded-xl w-full max-w-3xl max-h-[90vh] overflow-y-auto min-w-0"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <div className="relative w-full aspect-[4/3] bg-gray-100 overflow-hidden">
-              <Image
-                src={active.imageUrl}
-                alt={active.caption || 'Gallery piece'}
-                fill
-                className="object-contain"
-                sizes="90vw"
-              />
-            </div>
-            <div className="p-4 sm:p-6">
-              <p className="text-xs uppercase tracking-wide text-pink-600 font-semibold">
-                {categoryName(active.categorySlug)}
-              </p>
-              <p className="mt-2 text-gray-800 break-words">{active.caption}</p>
-              <button
-                type="button"
-                onClick={() => setActive(null)}
-                className="mt-4 text-sm text-blue-600 hover:text-blue-800 underline"
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
+      {lightbox && !admin ? (
+        <GalleryLightbox
+          items={lightbox.items}
+          startId={lightbox.startId}
+          onClose={() => setLightbox(null)}
+        />
       ) : null}
     </div>
   )

@@ -8,9 +8,10 @@ import {
   fetchGalleryItems,
   toPublicGalleryItems,
 } from '@/lib/gallery'
-import { DEFAULT_STUDIO_TITLE, getStudioHomeContent } from '@/lib/studio'
+import { mergeHomeContent } from '@/lib/homeContent'
+import { hasAdminSession } from '@/lib/adminSession'
 import StudioGalleryClient from '@/components/studio/StudioGalleryClient'
-import StudioPublicHeader from '@/components/studio/StudioPublicHeader'
+import MarketingChrome from '@/components/home/MarketingChrome'
 import type { Metadata } from 'next'
 import type { SiteConfiguration } from '@/lib/types'
 
@@ -19,7 +20,11 @@ export const metadata: Metadata = {
   description: 'Gallery of custom balloon arches, banners, and event decor by CVL Designs.',
 }
 
-export default async function StudioPage() {
+export default async function StudioPage({
+  searchParams,
+}: {
+  searchParams: { category?: string }
+}) {
   let config: SiteConfiguration = {}
 
   try {
@@ -33,41 +38,20 @@ export default async function StudioPage() {
     fetchGalleryItems(false),
   ])
 
-  const getCfgStr = (key: string) =>
-    typeof config[key] === 'string' ? (config[key] as string).trim() : ''
-
-  const studio = getStudioHomeContent(config)
-  const headerLogo = getCfgStr('Header_Logo')
-  const headerLogoSrc = headerLogo
-    ? headerLogo.startsWith('/') || headerLogo.startsWith('http')
-      ? headerLogo
-      : `/images/brand/${headerLogo}`
-    : '/images/brand/VL Design Logo.png'
-  const businessName = (config.BusinessName as string) || 'CVL Designs'
+  const content = mergeHomeContent(config)
 
   return (
-    <main className="min-h-screen w-full max-w-full bg-gradient-to-b from-gray-50 to-gray-100 overflow-x-clip">
-      <StudioPublicHeader
-        businessName={studio.headerText}
-        logoSrc={headerLogoSrc}
-      />
-
-      <StudioGalleryClient
-        title={studio.title || DEFAULT_STUDIO_TITLE}
-        tagline={studio.tagline}
-        quoteButtonLabel={studio.quoteButtonLabel}
-        categories={categories}
-        items={toPublicGalleryItems(items)}
-      />
-
-      <footer className="bg-white border-t mt-8">
-        <div className="max-w-6xl mx-auto px-3 sm:px-6 py-6">
-          <p className="text-center text-gray-500 text-sm break-words">
-            {config.Footer || `© ${new Date().getFullYear()} ${businessName}. All rights reserved.`}
-          </p>
-        </div>
-      </footer>
-    </main>
+    <MarketingChrome content={content} showAdminLink={hasAdminSession()}>
+      <main id="main-content">
+        <StudioGalleryClient
+          key={searchParams.category || 'all'}
+          content={content}
+          categories={categories}
+          items={toPublicGalleryItems(items)}
+          initialCategory={searchParams.category}
+        />
+      </main>
+    </MarketingChrome>
   )
 }
 

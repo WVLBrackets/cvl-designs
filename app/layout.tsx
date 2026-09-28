@@ -7,7 +7,7 @@ const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
   title: 'CVL Designs',
-  description: 'Custom Apparel & Clothing',
+  description: 'Handmade balloons, banners, and custom team apparel by CVL Designs.',
 }
 
 export const viewport = {

@@ -195,7 +195,11 @@ export interface GalleryItem {
   categorySlug: string
   imageUrl: string
   caption: string
+  /** Studio gallery rotating hero. Sheet column `featured`. */
   featured: boolean
+  homeHero: boolean
+  /** Videos only: `delay` uses hero delay; `full` plays once then advances. */
+  heroVideoPlay: 'delay' | 'full'
   status: 'Public' | 'Draft'
   price: number
   createdAt: string
@@ -211,5 +215,7 @@ export interface PublicGalleryItem {
   imageUrl: string
   caption: string
   featured: boolean
+  homeHero: boolean
+  heroVideoPlay: 'delay' | 'full'
 }
 

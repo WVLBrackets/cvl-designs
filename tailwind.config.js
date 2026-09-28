@@ -8,6 +8,14 @@ module.exports = {
   theme: {
     extend: {
       colors: {
+        cvl: {
+          cream: '#f6f1ea',
+          ink: '#2a241f',
+          blush: '#c47b7c',
+          sage: '#8fa38c',
+          gold: '#c4a56a',
+          kraft: '#c4a574',
+        },
         primary: {
           50: '#f0f9ff',
           100: '#e0f2fe',

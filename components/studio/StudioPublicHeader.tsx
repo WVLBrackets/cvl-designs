@@ -14,7 +14,7 @@ interface StudioPublicHeaderProps {
 export default function StudioPublicHeader({
   businessName,
   logoSrc,
-  secondaryHref = '/home',
+  secondaryHref = '/team-stores',
   secondaryLabel = 'Stores',
 }: StudioPublicHeaderProps) {
   return (

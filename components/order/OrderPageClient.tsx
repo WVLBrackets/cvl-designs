@@ -13,7 +13,7 @@ export default function OrderPageClient({ errorMessage }: { errorMessage?: strin
   useEffect(() => {
     // If there's an error message, redirect to home with error
     if (errorMessage) {
-      router.push(`/home?error=${encodeURIComponent(errorMessage)}`)
+      router.push(`/team-stores?error=${encodeURIComponent(errorMessage)}`)
       return
     }
     

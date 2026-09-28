@@ -1,142 +1,218 @@
 /**
- * Studio quote requests — validation and Config spreadsheet persistence.
+ * Studio quote requests — validation and Neon persistence.
  */
 
+import { desc, eq } from 'drizzle-orm'
 import { z } from 'zod'
-import { getSheetsClient } from './googleSheets'
-import { getSheetId, getSheetEnvironmentLabel } from './config'
+import { getDb } from '@/db'
+import { quotes, type QuoteRow, type QuoteStatus } from '@/db/schema'
+import { ensureQuoteTables } from '@/db/ensure'
+import { generateQuoteId } from '@/lib/quoteNumber'
+import { listMemoryQuotes, saveMemoryQuote, shouldUseMemoryQuotes, updateMemoryQuote } from '@/lib/quoteMemory'
+import {
+  emptyQuoteAnswers,
+  parsePhotoList,
+  type QuoteAnswers,
+} from '@/lib/quoteForm'
+import { normalizeQuoteRecord, type StudioQuoteRecord } from '@/lib/quoteTypes'
 import { sanitizeString } from './validation'
 
-const QUOTES_TAB = 'Studio Quotes'
+export type { StudioQuoteRecord } from '@/lib/quoteTypes'
+export { quoteStatuses, QUOTE_STATUS_LABELS } from '@/lib/quoteTypes'
 
-const phoneRegex = /^[\d\s()+-]{10,20}$/
+export type StudioQuoteInput = QuoteAnswers
 
-export const studioQuoteSchema = z.object({
-  firstName: z.string().min(1, 'First name is required').max(50).transform(sanitizeString),
-  lastName: z.string().min(1, 'Last name is required').max(50).transform(sanitizeString),
-  email: z
-    .string()
-    .min(1, 'Email is required')
-    .max(254)
-    .email('Invalid email format')
-    .transform((val) => val.toLowerCase().trim()),
-  phone: z
-    .string()
-    .min(10, 'Phone number is too short')
-    .max(20)
-    .regex(phoneRegex, 'Invalid phone number format')
-    .transform((val) => val.trim()),
-  eventDate: z.string().max(40).transform(sanitizeString).optional().default(''),
-  occasion: z.string().max(80).transform(sanitizeString).optional().default(''),
-  location: z.string().max(120).transform(sanitizeString).optional().default(''),
-  interests: z.array(z.enum(['balloons', 'banners'])).optional().default([]),
-  details: z
-    .string()
-    .min(1, 'Please describe what you would like')
-    .max(2000)
-    .transform(sanitizeString),
+export const quoteStatusSchema = z.enum(['new', 'in_review', 'quoted', 'won', 'lost'])
+
+export const quoteAdminPatchSchema = z.object({
+  id: z.string().min(1).max(80),
+  status: quoteStatusSchema.optional(),
+  adminNotes: z.string().max(4000).transform(sanitizeString).optional(),
 })
 
-export type StudioQuoteInput = z.infer<typeof studioQuoteSchema>
-
-export interface StudioQuoteRecord extends StudioQuoteInput {
-  id: string
-  submittedAt: string
-  environment: string
-}
-
 /**
- * Build a quoted A1 range so tab names with spaces work in the Sheets API.
+ * Split stored interests back into the public form values.
  *
- * @param title - Tab name
- * @param a1 - Cell or range inside the tab
+ * @param value - Comma-separated interests column
  */
-function sheetRange(title: string, a1: string): string {
-  const escaped = title.replace(/'/g, "''")
-  return `'${escaped}'!${a1}`
+function parseInterests(value: string): string[] {
+  return value
+    .split(',')
+    .map((part) => part.trim())
+    .filter((part) => part === 'balloons' || part === 'banners')
 }
 
 /**
- * Create the Studio Quotes tab with headers when it does not exist yet.
+ * String cell from a quote row.
+ *
+ * @param row - Database row
+ * @param key - Drizzle field
  */
-async function ensureQuotesTab(): Promise<void> {
-  const sheets = await getSheetsClient()
-  const spreadsheetId = getSheetId('config')
-  const headers = [
-    'id',
-    'submittedAt',
-    'environment',
-    'firstName',
-    'lastName',
-    'email',
-    'phone',
-    'eventDate',
-    'occasion',
-    'location',
-    'interests',
-    'details',
-    'status',
-  ]
+function cell(row: QuoteRow, key: keyof QuoteRow): string {
+  const value = row[key]
+  if (value instanceof Date) return value.toISOString()
+  return String(value ?? '')
+}
 
-  try {
-    await sheets.spreadsheets.values.get({
-      spreadsheetId,
-      range: sheetRange(QUOTES_TAB, 'A1:A1'),
-    })
-  } catch {
-    await sheets.spreadsheets.batchUpdate({
-      spreadsheetId,
-      requestBody: {
-        requests: [{ addSheet: { properties: { title: QUOTES_TAB } } }],
-      },
-    })
-    await sheets.spreadsheets.values.update({
-      spreadsheetId,
-      range: sheetRange(QUOTES_TAB, 'A1'),
-      valueInputOption: 'RAW',
-      requestBody: { values: [headers] },
-    })
+/**
+ * Map a database row to the API record shape.
+ *
+ * @param row - Quotes table row
+ */
+export function toStudioQuoteRecord(row: QuoteRow): StudioQuoteRecord {
+  const empty = emptyQuoteAnswers()
+  return normalizeQuoteRecord({
+    ...empty,
+    id: row.id,
+    surface: row.surface,
+    firstName: cell(row, 'firstName'),
+    lastName: cell(row, 'lastName'),
+    email: cell(row, 'email'),
+    phone: cell(row, 'phone'),
+    eventDate: cell(row, 'eventDate'),
+    occasion: cell(row, 'occasion'),
+    location: cell(row, 'location'),
+    interests: parseInterests(cell(row, 'interests')),
+    details: cell(row, 'details'),
+    needByDate: cell(row, 'needByDate'),
+    occasionOther: cell(row, 'occasionOther'),
+    venueType: cell(row, 'venueType'),
+    guestCount: cell(row, 'guestCount'),
+    budgetRange: cell(row, 'budgetRange'),
+    theme: cell(row, 'theme'),
+    colorScheme: cell(row, 'colorScheme'),
+    wantDraft: cell(row, 'wantDraft'),
+    balloonStyle: cell(row, 'balloonStyle'),
+    balloonIndoorOutdoor: cell(row, 'balloonIndoorOutdoor'),
+    balloonQuantity: cell(row, 'balloonQuantity'),
+    balloonNotes: cell(row, 'balloonNotes'),
+    bannerWording: cell(row, 'bannerWording'),
+    bannerFontStyle: cell(row, 'bannerFontStyle'),
+    bannerDesigns: cell(row, 'bannerDesigns'),
+    bannerSize: cell(row, 'bannerSize'),
+    bannerQuantity: cell(row, 'bannerQuantity'),
+    bannerHangMethod: cell(row, 'bannerHangMethod'),
+    venuePhotos: parsePhotoList(cell(row, 'venuePhotos')),
+    inspirationPhotos: parsePhotoList(cell(row, 'inspirationPhotos')),
+    socialPosting: cell(row, 'socialPosting'),
+    howHeard: cell(row, 'howHeard'),
+    status: row.status,
+    adminNotes: cell(row, 'adminNotes'),
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString(),
+  })
+}
+
+/**
+ * Build insert/update column values from validated answers.
+ *
+ * @param input - Quote answers
+ */
+export function quoteAnswerColumns(input: QuoteAnswers) {
+  const str = (key: string) => String(input[key] || '')
+  const photos = (key: string) => JSON.stringify(parsePhotoList(input[key]))
+  const interests = Array.isArray(input.interests)
+    ? input.interests.filter((item) => item === 'balloons' || item === 'banners')
+    : []
+  return {
+    firstName: str('firstName'),
+    lastName: str('lastName'),
+    email: str('email'),
+    phone: str('phone'),
+    eventDate: str('eventDate'),
+    occasion: str('occasion'),
+    location: str('location'),
+    interests: interests.join(', '),
+    details: str('details'),
+    needByDate: str('needByDate'),
+    occasionOther: str('occasionOther'),
+    venueType: str('venueType'),
+    guestCount: str('guestCount'),
+    budgetRange: str('budgetRange'),
+    theme: str('theme'),
+    colorScheme: str('colorScheme'),
+    wantDraft: str('wantDraft'),
+    balloonStyle: str('balloonStyle'),
+    balloonIndoorOutdoor: str('balloonIndoorOutdoor'),
+    balloonQuantity: str('balloonQuantity'),
+    balloonNotes: str('balloonNotes'),
+    bannerWording: str('bannerWording'),
+    bannerFontStyle: str('bannerFontStyle'),
+    bannerDesigns: str('bannerDesigns'),
+    bannerSize: str('bannerSize'),
+    bannerQuantity: str('bannerQuantity'),
+    bannerHangMethod: str('bannerHangMethod'),
+    venuePhotos: photos('venuePhotos'),
+    inspirationPhotos: photos('inspirationPhotos'),
+    socialPosting: str('socialPosting'),
+    howHeard: str('howHeard'),
   }
 }
 
 /**
- * Append a quote request to the Config spreadsheet Studio Quotes tab.
+ * Insert a new quote request.
  *
  * @param input - Validated quote fields
  */
 export async function saveStudioQuote(input: StudioQuoteInput): Promise<StudioQuoteRecord> {
-  await ensureQuotesTab()
-  const sheets = await getSheetsClient()
-  const spreadsheetId = getSheetId('config')
-  const record: StudioQuoteRecord = {
-    ...input,
-    id: `q-${Date.now().toString(36)}`,
-    submittedAt: new Date().toISOString(),
-    environment: getSheetEnvironmentLabel(),
+  if (shouldUseMemoryQuotes()) {
+    console.warn('[quotes] DATABASE_URL is not set; storing this quote in .data/quotes.json for local only')
+    return saveMemoryQuote(input)
   }
+  await ensureQuoteTables()
+  const { id, surface } = await generateQuoteId()
+  const db = getDb()
+  const [row] = await db
+    .insert(quotes)
+    .values({
+      id,
+      surface,
+      ...quoteAnswerColumns(input),
+      status: 'new',
+      adminNotes: '',
+    })
+    .returning()
 
-  await sheets.spreadsheets.values.append({
-    spreadsheetId,
-    range: sheetRange(QUOTES_TAB, 'A2'),
-    valueInputOption: 'RAW',
-    requestBody: {
-      values: [[
-        record.id,
-        record.submittedAt,
-        record.environment,
-        record.firstName,
-        record.lastName,
-        record.email,
-        record.phone,
-        record.eventDate,
-        record.occasion,
-        record.location,
-        record.interests.join(', '),
-        record.details,
-        'New',
-      ]],
-    },
-  })
+  if (!row) {
+    throw new Error('Quote was not saved')
+  }
+  return toStudioQuoteRecord(row)
+}
 
-  return record
+/**
+ * List quotes newest first for admin.
+ */
+export async function listStudioQuotes(): Promise<StudioQuoteRecord[]> {
+  if (shouldUseMemoryQuotes()) {
+    return listMemoryQuotes()
+  }
+  await ensureQuoteTables()
+  const db = getDb()
+  const rows = await db.select().from(quotes).orderBy(desc(quotes.createdAt))
+  return rows.map(toStudioQuoteRecord)
+}
+
+/**
+ * Update quote status and/or internal notes.
+ *
+ * @param id - Quote number
+ * @param patch - Fields to change
+ */
+export async function updateStudioQuote(
+  id: string,
+  patch: { status?: QuoteStatus; adminNotes?: string }
+): Promise<StudioQuoteRecord | null> {
+  if (shouldUseMemoryQuotes()) {
+    return updateMemoryQuote(id, patch)
+  }
+  await ensureQuoteTables()
+  const db = getDb()
+  const updates: Partial<typeof quotes.$inferInsert> = {
+    updatedAt: new Date(),
+  }
+  if (patch.status) updates.status = patch.status
+  if (patch.adminNotes !== undefined) updates.adminNotes = patch.adminNotes
+
+  const [row] = await db.update(quotes).set(updates).where(eq(quotes.id, id)).returning()
+  return row ? toStudioQuoteRecord(row) : null
 }

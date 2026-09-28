@@ -2,12 +2,23 @@
 
 import { FormEvent, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import Image from 'next/image'
+import GalleryMedia from '@/components/studio/GalleryMedia'
+import HeroVideoPlayFields from '@/components/studio/HeroVideoPlayFields'
+import {
+  GALLERY_FILE_ACCEPT,
+  galleryFileKind,
+  gallerySafeFileName,
+  isGalleryVideoUrl,
+  parseHeroVideoPlay,
+  shouldClientUploadToBlob,
+  type HeroVideoPlay,
+} from '@/lib/galleryMedia'
 import type { GalleryCategory, GalleryItem } from '@/lib/types'
 
 interface StudioAdminClientProps {
   categories: GalleryCategory[]
   items: GalleryItem[]
+  embedded?: boolean
 }
 
 interface DeletedSnapshot {
@@ -16,9 +27,18 @@ interface DeletedSnapshot {
 }
 
 /**
- * Password form for /studio/admin
+ * Password form for studio and homepage admin screens.
+ *
+ * @param title - Heading shown above the password field
+ * @param description - Short explanation of the admin area
  */
-export function StudioAdminLogin() {
+export function StudioAdminLogin({
+  title = 'Studio Admin',
+  description = 'Add gallery photos and videos here. Visitors never see this screen.',
+}: {
+  title?: string
+  description?: string
+}) {
   const router = useRouter()
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
@@ -51,18 +71,18 @@ export function StudioAdminLogin() {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="max-w-sm mx-auto bg-white rounded-lg shadow-lg p-6 space-y-4 min-w-0">
-      <h1 className="text-2xl font-bold text-gray-900 text-center">Studio Admin</h1>
-      <p className="text-sm text-gray-600 text-center">
-        Add gallery photos here. Visitors never see this screen.
+    <form onSubmit={handleSubmit} className="mx-auto max-w-sm min-w-0 space-y-4 rounded-2xl border home-border home-bg-2 p-6 shadow-sm">
+      <h1 className="text-center font-serif text-2xl font-semibold home-text">{title}</h1>
+      <p className="text-center text-sm home-text-muted">
+        {description}
       </p>
-      <label className="block text-sm font-medium text-gray-700">
+      <label className="block text-sm font-medium home-text">
         Password
         <input
           type="password"
           value={password}
           onChange={(event) => setPassword(event.target.value)}
-          className="mt-1 w-full max-w-full rounded-lg border border-gray-300 px-3 py-2"
+          className="mt-1 w-full max-w-full rounded-lg border home-border px-3 py-2 home-bg"
           autoComplete="current-password"
           required
         />
@@ -71,7 +91,7 @@ export function StudioAdminLogin() {
       <button
         type="submit"
         disabled={pending}
-        className="w-full py-2 rounded-lg bg-pink-500 hover:bg-pink-600 disabled:bg-gray-400 text-white font-semibold"
+        className="w-full rounded-full home-accent-bg py-2 font-semibold text-white disabled:bg-gray-400"
       >
         {pending ? 'Signing in…' : 'Sign in'}
       </button>
@@ -88,7 +108,13 @@ function readGalleryFields(data: FormData) {
   return {
     caption: String(data.get('caption') || '').trim(),
     categorySlug: String(data.get('categorySlug') || '').trim().toLowerCase(),
-    featured: data.get('featured') === 'on' || data.get('featured') === 'true',
+    studioHero:
+      data.get('studioHero') === 'on' ||
+      data.get('studioHero') === 'true' ||
+      data.get('featured') === 'on' ||
+      data.get('featured') === 'true',
+    homeHero: data.get('homeHero') === 'on' || data.get('homeHero') === 'true',
+    heroVideoPlay: parseHeroVideoPlay(data.get('heroVideoPlay')),
     status: String(data.get('status') || 'Public') === 'Draft' ? 'Draft' : 'Public',
     price: Number(data.get('price') || 0) || 0,
   }
@@ -107,7 +133,7 @@ function replaceItem(items: GalleryItem[], next: GalleryItem): GalleryItem[] {
 /**
  * Admin dashboard: upload a new piece, edit existing rows, and review the gallery.
  */
-export default function StudioAdminClient({ categories, items }: StudioAdminClientProps) {
+export default function StudioAdminClient({ categories, items, embedded = false }: StudioAdminClientProps) {
   const router = useRouter()
   const galleryRef = useRef<HTMLElement>(null)
   const [galleryItems, setGalleryItems] = useState(items)
@@ -117,6 +143,8 @@ export default function StudioAdminClient({ categories, items }: StudioAdminClie
   const [editing, setEditing] = useState<GalleryItem | null>(null)
   const [lastDeleted, setLastDeleted] = useState<DeletedSnapshot | null>(null)
   const [recoverOpen, setRecoverOpen] = useState(false)
+  const [addIsVideo, setAddIsVideo] = useState(false)
+  const [addVideoPlay, setAddVideoPlay] = useState<HeroVideoPlay>('delay')
 
   /**
    * Scroll the Current gallery heading into view after a delete.
@@ -134,7 +162,7 @@ export default function StudioAdminClient({ categories, items }: StudioAdminClie
   }
 
   /**
-   * Upload a gallery image without using GitHub.
+   * Upload a gallery photo or video without using GitHub.
    */
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -145,13 +173,47 @@ export default function StudioAdminClient({ categories, items }: StudioAdminClie
     const form = event.currentTarget
     const data = new FormData(form)
     const fields = readGalleryFields(data)
-    data.set('featured', fields.featured ? 'true' : 'false')
+    data.set('studioHero', fields.studioHero ? 'true' : 'false')
+    data.set('homeHero', fields.homeHero ? 'true' : 'false')
+    data.set('heroVideoPlay', addIsVideo ? addVideoPlay : 'delay')
+    const file = data.get('image')
 
     try {
-      const response = await fetch('/api/studio/admin/gallery', {
-        method: 'POST',
-        body: data,
-      })
+      let response: Response
+      if (file instanceof File && file.size > 0 && shouldClientUploadToBlob(file)) {
+        try {
+          const { upload } = await import('@vercel/blob/client')
+          const blob = await upload(`gallery/${gallerySafeFileName(file.name)}`, file, {
+            access: 'public',
+            handleUploadUrl: '/api/studio/admin/gallery/blob',
+          })
+          response = await fetch('/api/studio/admin/gallery', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              imageUrl: blob.url,
+              caption: fields.caption,
+              categorySlug: fields.categorySlug,
+              studioHero: fields.studioHero,
+              featured: fields.studioHero,
+              homeHero: fields.homeHero,
+              heroVideoPlay: addIsVideo ? addVideoPlay : 'delay',
+              status: fields.status,
+              price: fields.price,
+            }),
+          })
+        } catch {
+          response = await fetch('/api/studio/admin/gallery', {
+            method: 'POST',
+            body: data,
+          })
+        }
+      } else {
+        response = await fetch('/api/studio/admin/gallery', {
+          method: 'POST',
+          body: data,
+        })
+      }
       const result = await response.json()
       if (!response.ok || !result.success) {
         setError(result.error || 'Save failed')
@@ -162,6 +224,8 @@ export default function StudioAdminClient({ categories, items }: StudioAdminClie
       }
       setMessage('Saved to the gallery.')
       form.reset()
+      setAddIsVideo(false)
+      setAddVideoPlay('delay')
     } catch {
       setError('Save failed')
     } finally {
@@ -185,7 +249,7 @@ export default function StudioAdminClient({ categories, items }: StudioAdminClie
       const response = await fetch('/api/studio/admin/gallery', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: editing.id, ...fields }),
+        body: JSON.stringify({ id: editing.id, ...fields, featured: fields.studioHero, studioHero: fields.studioHero }),
       })
       const result = await response.json()
       if (!response.ok || !result.success) {
@@ -205,15 +269,21 @@ export default function StudioAdminClient({ categories, items }: StudioAdminClie
   }
 
   /**
-   * Toggle whether a photo is included in the public rotating hero.
-   *
-   * @param item - Gallery row to update
-   * @param featured - Next hero flag
+   * Toggle Home Hero and/or Studio Hero for a gallery photo.
    */
-  async function handleHeroToggle(item: GalleryItem, featured: boolean) {
+  async function handleHeroFlags(
+    item: GalleryItem,
+    patch: { featured?: boolean; homeHero?: boolean; heroVideoPlay?: HeroVideoPlay }
+  ) {
     clearUndo()
     setError('')
-    setGalleryItems((current) => replaceItem(current, { ...item, featured }))
+    const next = {
+      ...item,
+      featured: patch.featured !== undefined ? patch.featured : item.featured,
+      homeHero: patch.homeHero !== undefined ? patch.homeHero : item.homeHero,
+      heroVideoPlay: patch.heroVideoPlay !== undefined ? patch.heroVideoPlay : item.heroVideoPlay,
+    }
+    setGalleryItems((current) => replaceItem(current, next))
     try {
       const response = await fetch('/api/studio/admin/gallery', {
         method: 'PATCH',
@@ -222,7 +292,10 @@ export default function StudioAdminClient({ categories, items }: StudioAdminClie
           id: item.id,
           caption: item.caption,
           categorySlug: item.categorySlug,
-          featured,
+          studioHero: next.featured,
+          featured: next.featured,
+          homeHero: next.homeHero,
+          heroVideoPlay: next.heroVideoPlay,
           status: item.status,
           price: item.price,
         }),
@@ -316,30 +389,46 @@ export default function StudioAdminClient({ categories, items }: StudioAdminClie
   }
 
   return (
-    <div className="w-full max-w-4xl mx-auto space-y-8 min-w-0 overflow-x-hidden">
-      <div className="flex items-center justify-between gap-3 min-w-0">
-        <h1 className="text-xl sm:text-2xl font-bold text-gray-900 truncate">Gallery admin</h1>
-        <button type="button" onClick={logout} className="text-sm text-blue-600 underline flex-shrink-0">
+    <div className="mx-auto w-full min-w-0 max-w-4xl space-y-8 overflow-x-hidden">
+      {embedded ? (
+        <div>
+          <h2 className="font-serif text-2xl font-semibold home-text">Gallery photos</h2>
+          <p className="mt-1 text-sm home-text-muted">
+            Add, edit, or hide photos here. This list saves immediately and is separate from SAVE above.
+          </p>
+        </div>
+      ) : (
+      <div className="flex min-w-0 items-center justify-between gap-3">
+        <h1 className="truncate text-xl font-bold text-gray-900 sm:text-2xl">Gallery admin</h1>
+        <button type="button" onClick={logout} className="flex-shrink-0 text-sm text-blue-600 underline">
           Sign out
         </button>
       </div>
+      )}
 
       <form onSubmit={handleSubmit} className="bg-white rounded-lg shadow-lg p-4 sm:p-6 space-y-4 min-w-0 overflow-hidden">
-        <h2 className="text-lg font-semibold text-gray-900">Add a photo</h2>
+        <h2 className="text-lg font-semibold text-gray-900">Add a photo or video</h2>
         <p className="text-sm text-gray-600 break-words">
-          Uploads go to the gallery from this screen — no GitHub step. Instagram and Facebook are
-          personal accounts, so posting there is still copy-and-paste for now.
+          Uploads go to the gallery from this screen — no GitHub step. Photos up to 4.5 MB; videos
+          up to 80 MB (MP4, WebM, or MOV). Instagram and Facebook posting is still copy-and-paste
+          for now.
         </p>
 
         <label className="block text-sm font-medium text-gray-700 min-w-0">
-          Photo
+          Photo or video
           <span className="mt-1 block w-full max-w-full min-w-0 overflow-hidden">
             <input
               type="file"
               name="image"
-              accept="image/jpeg,image/png,image/webp,image/gif"
+              accept={GALLERY_FILE_ACCEPT}
               required
               className="block w-full max-w-full min-w-0 text-sm"
+              onChange={(event) => {
+                const chosen = event.target.files?.[0]
+                const video = Boolean(chosen && galleryFileKind(chosen) === 'video')
+                setAddIsVideo(video)
+                if (!video) setAddVideoPlay('delay')
+              }}
             />
           </span>
         </label>
@@ -367,8 +456,12 @@ export default function StudioAdminClient({ categories, items }: StudioAdminClie
 
         <div className="flex flex-col sm:flex-row sm:flex-wrap gap-4">
           <label className="inline-flex items-center gap-2 text-sm text-gray-700">
-            <input type="checkbox" name="featured" className="rounded" />
-            Featured in the rotating hero
+            <input type="checkbox" name="homeHero" className="rounded" />
+            Home Hero
+          </label>
+          <label className="inline-flex items-center gap-2 text-sm text-gray-700">
+            <input type="checkbox" name="studioHero" className="rounded" />
+            Studio Hero
           </label>
           <label className="block text-sm font-medium text-gray-700">
             Visibility
@@ -378,6 +471,9 @@ export default function StudioAdminClient({ categories, items }: StudioAdminClie
             </select>
           </label>
         </div>
+        {addIsVideo ? (
+          <HeroVideoPlayFields value={addVideoPlay} onChange={setAddVideoPlay} />
+        ) : null}
 
         {error && !editing && !recoverOpen ? <p className="text-sm text-red-600 break-words">{error}</p> : null}
         {message && !editing && !recoverOpen ? <p className="text-sm text-green-700 break-words">{message}</p> : null}
@@ -385,7 +481,7 @@ export default function StudioAdminClient({ categories, items }: StudioAdminClie
         <button
           type="submit"
           disabled={pending}
-          className="px-5 py-2 rounded-lg bg-pink-500 hover:bg-pink-600 disabled:bg-gray-400 text-white font-semibold"
+          className="rounded-full home-accent-bg px-5 py-2 font-semibold text-white hover:opacity-90 disabled:bg-gray-400"
         >
           {pending ? 'Saving…' : 'Add to gallery'}
         </button>
@@ -404,13 +500,13 @@ export default function StudioAdminClient({ categories, items }: StudioAdminClie
           </button>
         </div>
         <p className="text-sm text-gray-600 mb-4 break-words">
-          Tap a photo to edit caption, category, price, or Public/Draft. Use In hero and the trash can without opening the photo.
+          Tap a photo to edit caption, category, price, or Public/Draft. Use Home Hero, Studio Hero, and the trash can without opening the photo.
         </p>
         <div className="grid grid-cols-2 md:grid-cols-3 gap-3 min-w-0">
           {galleryItems.map((item, index) => (
             <article key={item.id} className="bg-white rounded-lg shadow overflow-hidden min-w-0 max-w-full">
               <div className="relative aspect-square bg-gray-100 overflow-hidden">
-                <Image src={item.imageUrl} alt={item.caption} fill className="object-cover" sizes="50vw" />
+                <GalleryMedia src={item.imageUrl} alt={item.caption} sizes="50vw" mode="thumb" />
                 <button
                   type="button"
                   onClick={() => {
@@ -434,7 +530,10 @@ export default function StudioAdminClient({ categories, items }: StudioAdminClie
                 </button>
               </div>
               <div className="p-3 min-w-0">
-                <p className="font-semibold text-pink-600 truncate">{item.categorySlug}</p>
+                <p className="truncate font-semibold home-accent">
+                  {categories.find((category) => category.slug === item.categorySlug)?.name ||
+                    item.categorySlug}
+                </p>
                 <p className="text-gray-800 line-clamp-2 break-words">{item.caption}</p>
                 <p className="text-xs text-gray-500 mt-1 break-words">
                   {item.status}
@@ -443,13 +542,32 @@ export default function StudioAdminClient({ categories, items }: StudioAdminClie
                 <label className="mt-2 flex items-center gap-2 text-xs text-gray-700">
                   <input
                     type="checkbox"
-                    checked={item.featured}
+                    checked={Boolean(item.homeHero)}
                     disabled={pending}
-                    onChange={(event) => handleHeroToggle(item, event.target.checked)}
+                    onChange={(event) => handleHeroFlags(item, { homeHero: event.target.checked })}
                     className="rounded"
                   />
-                  In hero
+                  Home Hero
                 </label>
+                <label className="mt-1 flex items-center gap-2 text-xs text-gray-700">
+                  <input
+                    type="checkbox"
+                    checked={item.featured}
+                    disabled={pending}
+                    onChange={(event) => handleHeroFlags(item, { featured: event.target.checked })}
+                    className="rounded"
+                  />
+                  Studio Hero
+                </label>
+                {isGalleryVideoUrl(item.imageUrl) ? (
+                  <div className="mt-2">
+                    <HeroVideoPlayFields
+                      name={`heroVideoPlay-${item.id}`}
+                      value={item.heroVideoPlay || 'delay'}
+                      onChange={(heroVideoPlay) => handleHeroFlags(item, { heroVideoPlay })}
+                    />
+                  </div>
+                ) : null}
               </div>
             </article>
           ))}
@@ -473,7 +591,13 @@ export default function StudioAdminClient({ categories, items }: StudioAdminClie
           >
             <h2 className="text-lg font-semibold text-gray-900">Edit photo</h2>
             <div className="relative w-full aspect-[4/3] rounded-lg overflow-hidden bg-gray-100">
-              <Image src={editing.imageUrl} alt={editing.caption} fill className="object-cover" sizes="100vw" />
+              <GalleryMedia
+                src={editing.imageUrl}
+                alt={editing.caption}
+                sizes="100vw"
+                mode={isGalleryVideoUrl(editing.imageUrl) ? 'lightbox' : 'thumb'}
+                objectFit={isGalleryVideoUrl(editing.imageUrl) ? 'contain' : 'cover'}
+              />
             </div>
 
             <label className="block text-sm font-medium text-gray-700">
@@ -516,9 +640,19 @@ export default function StudioAdminClient({ categories, items }: StudioAdminClie
             </label>
 
             <label className="inline-flex items-center gap-2 text-sm text-gray-700">
-              <input type="checkbox" name="featured" defaultChecked={editing.featured} className="rounded" />
-              Featured in the rotating hero
+              <input type="checkbox" name="homeHero" defaultChecked={editing.homeHero} className="rounded" />
+              Home Hero
             </label>
+            <label className="inline-flex items-center gap-2 text-sm text-gray-700">
+              <input type="checkbox" name="studioHero" defaultChecked={editing.featured} className="rounded" />
+              Studio Hero
+            </label>
+            {isGalleryVideoUrl(editing.imageUrl) ? (
+              <HeroVideoPlayFields
+                value={editing.heroVideoPlay || 'delay'}
+                onChange={(heroVideoPlay) => setEditing({ ...editing, heroVideoPlay })}
+              />
+            ) : null}
 
             <label className="block text-sm font-medium text-gray-700">
               Visibility
@@ -538,7 +672,7 @@ export default function StudioAdminClient({ categories, items }: StudioAdminClie
               <button
                 type="submit"
                 disabled={pending}
-                className="px-5 py-2 rounded-lg bg-pink-500 hover:bg-pink-600 disabled:bg-gray-400 text-white font-semibold"
+                className="rounded-full home-accent-bg px-5 py-2 font-semibold text-white hover:opacity-90 disabled:bg-gray-400"
               >
                 {pending ? 'Saving…' : 'Save changes'}
               </button>
@@ -564,12 +698,11 @@ export default function StudioAdminClient({ categories, items }: StudioAdminClie
           <div className="bg-white rounded-xl w-full max-w-lg p-4 sm:p-6 space-y-4 min-w-0">
             <h2 className="text-lg font-semibold text-gray-900">Recover this photo?</h2>
             <div className="relative w-full aspect-[4/3] rounded-lg overflow-hidden bg-gray-100">
-              <Image
+              <GalleryMedia
                 src={lastDeleted.item.imageUrl}
                 alt={lastDeleted.item.caption}
-                fill
-                className="object-cover"
                 sizes="100vw"
+                mode="thumb"
               />
             </div>
             <p className="text-sm text-gray-700 break-words">{lastDeleted.item.caption}</p>
@@ -579,7 +712,7 @@ export default function StudioAdminClient({ categories, items }: StudioAdminClie
                 type="button"
                 disabled={pending}
                 onClick={handleRecoverYes}
-                className="px-5 py-2 rounded-lg bg-pink-500 hover:bg-pink-600 disabled:bg-gray-400 text-white font-semibold"
+                className="rounded-full home-accent-bg px-5 py-2 font-semibold text-white hover:opacity-90 disabled:bg-gray-400"
               >
                 Yes
               </button>

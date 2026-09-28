@@ -168,6 +168,9 @@ export const ORDER_RATE_LIMIT: RateLimitConfig = {
   windowMs: 60 * 1000, // 1 minute
 }
 
+/** Same window as apparel orders: 3 quote submits per IP per minute. */
+export const QUOTE_RATE_LIMIT: RateLimitConfig = ORDER_RATE_LIMIT
+
 /**
  * Generate rate limit headers for the response
  * @param result - Rate limit check result

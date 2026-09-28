@@ -7,6 +7,7 @@ import { getSheetsClient } from './googleSheets'
 import { getSheetId, getEnvironment, getSheetEnvironmentLabel, isVisibleOnCurrentSurface } from './config'
 import { listOrphanedGalleryBlobs, markGalleryBlobRecoveryDone } from './galleryImage'
 import type { GalleryCategory, GalleryItem, PublicGalleryItem } from './types'
+import { parseHeroVideoPlay } from './galleryMedia'
 
 const CATEGORIES_TAB = 'Gallery Categories'
 const ITEMS_TAB = 'Gallery'
@@ -43,29 +44,53 @@ function isTruthyCell(value: unknown): boolean {
  * @param title - Tab name
  * @param headers - Header row
  */
+/**
+ * Create a sheet tab with headers when it does not exist yet.
+ *
+ * @param title - Tab name
+ * @param headers - Header row
+ */
 async function ensureTab(title: string, headers: string[]): Promise<void> {
   const sheets = await getSheetsClient()
   const spreadsheetId = getSheetId('config')
+  const meta = await sheets.spreadsheets.get({
+    spreadsheetId,
+    fields: 'sheets.properties.title',
+  })
+  const exists = (meta.data.sheets || []).some(
+    (sheet) => sheet.properties?.title === title
+  )
 
-  try {
-    await sheets.spreadsheets.values.get({
-      spreadsheetId,
-      range: sheetRange(title, 'A1:A1'),
-    })
-  } catch {
-    await sheets.spreadsheets.batchUpdate({
-      spreadsheetId,
-      requestBody: {
-        requests: [{ addSheet: { properties: { title } } }],
-      },
-    })
-    await sheets.spreadsheets.values.update({
-      spreadsheetId,
-      range: sheetRange(title, 'A1'),
-      valueInputOption: 'RAW',
-      requestBody: { values: [headers] },
-    })
+  if (!exists) {
+    try {
+      await sheets.spreadsheets.batchUpdate({
+        spreadsheetId,
+        requestBody: {
+          requests: [{ addSheet: { properties: { title } } }],
+        },
+      })
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      if (!message.toLowerCase().includes('already exists')) {
+        throw error
+      }
+    }
   }
+
+  const headerRow = await sheets.spreadsheets.values.get({
+    spreadsheetId,
+    range: sheetRange(title, 'A1:K1'),
+  })
+  const current = (headerRow.data.values?.[0] || []).map((cell) => String(cell || '').trim())
+  const missing = headers.some((header, index) => current[index] !== header)
+  if (!missing && current.length >= headers.length) return
+
+  await sheets.spreadsheets.values.update({
+    spreadsheetId,
+    range: sheetRange(title, 'A1'),
+    valueInputOption: 'RAW',
+    requestBody: { values: [headers] },
+  })
 }
 
 /**
@@ -83,6 +108,8 @@ async function ensureGalleryTabs(): Promise<void> {
     'price',
     'createdAt',
     'environment',
+    'homeHero',
+    'heroVideoPlay',
   ])
 
   const sheets = await getSheetsClient()
@@ -162,10 +189,84 @@ function parseGalleryRow(row: unknown[]): GalleryItem | null {
     imageUrl,
     caption: String(row[3] || '').trim(),
     featured: isTruthyCell(row[4]),
+    homeHero: isTruthyCell(row[9]),
+    heroVideoPlay: parseHeroVideoPlay(row[10]),
     status,
     price: Number(String(row[6] || '0').replace(/[$,]/g, '')) || 0,
     createdAt: String(row[7] || '').trim(),
     environment: String(row[8] || 'All').trim() || 'All',
+  }
+}
+
+const REEDY_HOCO_ID = 'g-reedy-hoco-2026'
+const REEDY_HOCO_IMAGE = '/images/home/reedy-hoco-2026.jpg'
+
+/**
+ * Add the Reedy HOCO banner to the gallery once, marked for both heroes.
+ *
+ * @param existing - Gallery rows already loaded
+ */
+async function ensureReedyHocoGalleryItem(existing: GalleryItem[]): Promise<GalleryItem[]> {
+  const found = existing.some(
+    (item) => item.id === REEDY_HOCO_ID || item.imageUrl.includes('reedy-hoco-2026')
+  )
+  if (found) return existing
+
+  const created = await restoreGalleryItem({
+    id: REEDY_HOCO_ID,
+    categorySlug: 'banners',
+    imageUrl: REEDY_HOCO_IMAGE,
+    caption: 'Reedy HOCO 2026',
+    featured: true,
+    homeHero: true,
+    heroVideoPlay: 'delay',
+    status: 'Public',
+    price: 0,
+    createdAt: new Date().toISOString(),
+    environment: 'All',
+  })
+  return [created, ...existing]
+}
+
+/**
+ * Rename a gallery category. Slug stays the same so existing photos keep their filter.
+ *
+ * @param slug - Category slug
+ * @param name - Display name shown on chips and gallery cards
+ */
+export async function updateGalleryCategoryName(
+  slug: string,
+  name: string
+): Promise<GalleryCategory | null> {
+  const trimmed = name.trim()
+  if (!trimmed) return null
+  await ensureGalleryTabs()
+  const sheets = await getSheetsClient()
+  const spreadsheetId = getSheetId('config')
+  const response = await sheets.spreadsheets.values.get({
+    spreadsheetId,
+    range: sheetRange(CATEGORIES_TAB, 'A2:E50'),
+  })
+  const rows = response.data.values || []
+  const index = rows.findIndex((row) => String(row[0] || '').trim().toLowerCase() === slug)
+  if (index < 0) return null
+
+  const rowNumber = index + 2
+  const existing = rows[index]
+  const nextName = trimmed.slice(0, 40)
+  await sheets.spreadsheets.values.update({
+    spreadsheetId,
+    range: sheetRange(CATEGORIES_TAB, `B${rowNumber}`),
+    valueInputOption: 'RAW',
+    requestBody: { values: [[nextName]] },
+  })
+
+  return {
+    slug,
+    name: nextName,
+    sortOrder: Number(existing[2]) || 0,
+    active: existing[3] === undefined || existing[3] === '' ? true : isTruthyCell(existing[3]),
+    environment: String(existing[4] || 'All').trim() || 'All',
   }
 }
 
@@ -190,6 +291,8 @@ async function recoverMissingGalleryItems(existing: GalleryItem[]): Promise<Gall
         imageUrl: orphan.url,
         caption: orphan.caption,
         featured: false,
+        homeHero: false,
+        heroVideoPlay: 'delay',
         status: 'Public',
         price: 0,
         createdAt: orphan.createdAt,
@@ -213,7 +316,7 @@ export async function fetchGalleryItems(includeDrafts = false): Promise<GalleryI
     const spreadsheetId = getSheetId('config')
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId,
-      range: sheetRange(ITEMS_TAB, 'A2:I'),
+      range: sheetRange(ITEMS_TAB, 'A2:K'),
     })
     const rows = response.data.values || []
     const environment = getEnvironment()
@@ -227,8 +330,12 @@ export async function fetchGalleryItems(includeDrafts = false): Promise<GalleryI
       return [] as GalleryItem[]
     })
     const combined = recovered.length > 0 ? [...recovered, ...allItems] : allItems
+    const seeded = await ensureReedyHocoGalleryItem(combined).catch((error) => {
+      console.error('[gallery] Reedy HOCO seed failed:', error)
+      return combined
+    })
 
-    return combined
+    return seeded
       .filter((item) => isVisibleOnCurrentSurface(item.environment))
       .filter((item) => {
         if (includeDrafts) return true
@@ -251,12 +358,14 @@ export async function fetchGalleryItems(includeDrafts = false): Promise<GalleryI
 export function toPublicGalleryItems(items: GalleryItem[]): PublicGalleryItem[] {
   return items
     .filter((item) => item.status === 'Public')
-    .map(({ id, categorySlug, imageUrl, caption, featured }) => ({
+    .map(({ id, categorySlug, imageUrl, caption, featured, homeHero, heroVideoPlay }) => ({
       id,
       categorySlug,
       imageUrl,
       caption,
       featured,
+      homeHero,
+      heroVideoPlay,
     }))
 }
 
@@ -265,6 +374,8 @@ export interface CreateGalleryItemInput {
   imageUrl: string
   caption: string
   featured: boolean
+  homeHero?: boolean
+  heroVideoPlay?: 'delay' | 'full'
   status: 'Public' | 'Draft'
   price: number
 }
@@ -282,6 +393,8 @@ export async function createGalleryItem(input: CreateGalleryItemInput): Promise<
   const environment = getSheetEnvironmentLabel()
   const createdAt = new Date().toISOString()
 
+  const heroVideoPlay = parseHeroVideoPlay(input.heroVideoPlay)
+
   await sheets.spreadsheets.values.append({
     spreadsheetId,
     range: sheetRange(ITEMS_TAB, 'A2'),
@@ -297,6 +410,8 @@ export async function createGalleryItem(input: CreateGalleryItemInput): Promise<
         input.price || 0,
         createdAt,
         environment,
+        input.homeHero ? 'TRUE' : 'FALSE',
+        heroVideoPlay,
       ]],
     },
   })
@@ -307,6 +422,8 @@ export async function createGalleryItem(input: CreateGalleryItemInput): Promise<
     imageUrl: input.imageUrl,
     caption: input.caption,
     featured: input.featured,
+    homeHero: Boolean(input.homeHero),
+    heroVideoPlay,
     status: input.status,
     price: input.price || 0,
     createdAt,
@@ -319,6 +436,8 @@ export interface UpdateGalleryItemInput {
   categorySlug: string
   caption: string
   featured: boolean
+  homeHero: boolean
+  heroVideoPlay?: 'delay' | 'full'
   status: 'Public' | 'Draft'
   price: number
 }
@@ -336,7 +455,7 @@ export async function updateGalleryItem(input: UpdateGalleryItemInput): Promise<
   const spreadsheetId = getSheetId('config')
   const response = await sheets.spreadsheets.values.get({
     spreadsheetId,
-    range: sheetRange(ITEMS_TAB, 'A2:I'),
+      range: sheetRange(ITEMS_TAB, 'A2:K'),
   })
   const rows = response.data.values || []
   const index = rows.findIndex((row) => String(row[0] || '').trim() === input.id)
@@ -350,6 +469,11 @@ export async function updateGalleryItem(input: UpdateGalleryItemInput): Promise<
     categorySlug: input.categorySlug,
     caption: input.caption,
     featured: input.featured,
+    homeHero: input.homeHero,
+    heroVideoPlay:
+      input.heroVideoPlay !== undefined
+        ? parseHeroVideoPlay(input.heroVideoPlay)
+        : existing.heroVideoPlay,
     status: input.status,
     price: input.price || 0,
   }
@@ -357,20 +481,10 @@ export async function updateGalleryItem(input: UpdateGalleryItemInput): Promise<
 
   await sheets.spreadsheets.values.update({
     spreadsheetId,
-    range: sheetRange(ITEMS_TAB, `A${rowNumber}:I${rowNumber}`),
+    range: sheetRange(ITEMS_TAB, `A${rowNumber}:K${rowNumber}`),
     valueInputOption: 'RAW',
     requestBody: {
-      values: [[
-        next.id,
-        next.categorySlug,
-        next.imageUrl,
-        next.caption,
-        next.featured ? 'TRUE' : 'FALSE',
-        next.status,
-        next.price || 0,
-        next.createdAt,
-        next.environment || 'Preview',
-      ]],
+      values: [galleryItemToRow(next)],
     },
   })
 
@@ -393,6 +507,8 @@ function galleryItemToRow(item: GalleryItem): (string | number)[] {
     item.price || 0,
     item.createdAt,
     item.environment || getSheetEnvironmentLabel(),
+    item.homeHero ? 'TRUE' : 'FALSE',
+    item.heroVideoPlay === 'full' ? 'full' : 'delay',
   ]
 }
 
@@ -426,7 +542,7 @@ export async function deleteGalleryItem(id: string): Promise<GalleryItem | null>
   const spreadsheetId = getSheetId('config')
   const response = await sheets.spreadsheets.values.get({
     spreadsheetId,
-    range: sheetRange(ITEMS_TAB, 'A2:I'),
+      range: sheetRange(ITEMS_TAB, 'A2:K'),
   })
   const rows = response.data.values || []
   const index = rows.findIndex((row) => String(row[0] || '').trim() === id)
@@ -468,7 +584,7 @@ export async function restoreGalleryItem(item: GalleryItem): Promise<GalleryItem
   const spreadsheetId = getSheetId('config')
   const response = await sheets.spreadsheets.values.get({
     spreadsheetId,
-    range: sheetRange(ITEMS_TAB, 'A2:I'),
+      range: sheetRange(ITEMS_TAB, 'A2:K'),
   })
   const rows = response.data.values || []
   const exists = rows.some((row) => String(row[0] || '').trim() === item.id)

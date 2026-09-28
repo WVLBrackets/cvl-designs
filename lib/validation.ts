@@ -24,6 +24,32 @@ export function sanitizeString(value: string): string {
 const phoneRegex = /^[\d\s()+-]{10,20}$/
 
 /**
+ * US 10-digit national number, dropping a leading country code 1 when present.
+ *
+ * @param value - Typed or autofilled phone string
+ */
+export function usPhoneDigits(value: string): string {
+  let digits = value.replace(/\D/g, '')
+  if (digits.length >= 11 && digits.startsWith('1')) {
+    digits = digits.slice(1)
+  }
+  return digits.slice(0, 10)
+}
+
+/**
+ * Display a US phone as (555) 555-5555 while typing or after autofill.
+ *
+ * @param value - Typed or autofilled phone string
+ */
+export function formatUsPhone(value: string): string {
+  const digits = usPhoneDigits(value)
+  if (digits.length === 0) return ''
+  if (digits.length <= 3) return `(${digits}`
+  if (digits.length <= 6) return `(${digits.slice(0, 3)}) ${digits.slice(3)}`
+  return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`
+}
+
+/**
  * Contact information schema
  */
 export const contactInfoSchema = z.object({
@@ -51,7 +77,8 @@ export const contactInfoSchema = z.object({
     .min(10, 'Phone number is too short')
     .max(20, 'Phone number is too long')
     .regex(phoneRegex, 'Invalid phone number format')
-    .transform((val: string) => val.trim()),
+    .transform((val: string) => formatUsPhone(val))
+    .refine((val) => usPhoneDigits(val).length === 10, 'Invalid phone number format'),
 })
 
 /**

@@ -36,6 +36,9 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
+# drizzle-kit output
+/drizzle/
+
 # invoices (contain sensitive customer data)
 /invoices/
 
@@ -45,4 +48,11 @@ next-env.d.ts
 # local studio gallery uploads (admin uses Vercel Blob in hosted envs)
 /public/images/gallery/*
 !/public/images/gallery/.gitkeep
+
+# local quote venue / inspiration uploads
+/public/images/quotes/**
+!/public/images/quotes/.gitkeep
+
+# local quote file store (used only when DATABASE_URL is missing)
+/.data/
 
