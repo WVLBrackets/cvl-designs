@@ -156,7 +156,7 @@ export function quoteAnswerColumns(input: QuoteAnswers) {
  */
 export async function saveStudioQuote(input: StudioQuoteInput): Promise<StudioQuoteRecord> {
   if (shouldUseMemoryQuotes()) {
-    console.warn('[quotes] DATABASE_URL is not set; storing this quote in .data/quotes.json for local only')
+    console.warn('[quotes] DATABASE_URL is not set; storing this quote in a JSON file (local or Preview)')
     return saveMemoryQuote(input)
   }
   await ensureQuoteTables()

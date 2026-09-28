@@ -1,5 +1,5 @@
 /**
- * File-backed quote store for local `next dev` when DATABASE_URL is not set.
+ * File-backed quote store when DATABASE_URL is not set (local and Preview/QA).
  */
 
 import fs from 'fs'
@@ -14,14 +14,15 @@ interface QuoteFile {
   quotes: StudioQuoteRecord[]
 }
 
-const dataDir = path.join(process.cwd(), '.data')
-const dataFile = path.join(dataDir, 'quotes.json')
+const dataFile = process.env.VERCEL
+  ? path.join('/tmp', 'cvl-quotes.json')
+  : path.join(process.cwd(), '.data', 'quotes.json')
 
 /**
- * Whether this process should keep quotes in a local file instead of Neon.
+ * Whether this process should keep quotes in a JSON file instead of Neon.
  */
 export function shouldUseMemoryQuotes(): boolean {
-  return !process.env.DATABASE_URL && getRuntimeSurface() === 'local'
+  return !process.env.DATABASE_URL
 }
 
 /**
@@ -46,7 +47,7 @@ function readFile(): QuoteFile {
  * @param data - Counters and quote rows
  */
 function writeFile(data: QuoteFile): void {
-  fs.mkdirSync(dataDir, { recursive: true })
+  fs.mkdirSync(path.dirname(dataFile), { recursive: true })
   fs.writeFileSync(dataFile, JSON.stringify(data, null, 2), 'utf8')
 }
 
