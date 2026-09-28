@@ -61,7 +61,7 @@ export function getSheetEnvironmentLabel(): 'Production' | 'Preview' {
 
 /**
  * Whether a sheet Environment cell is visible on this runtime.
- * Empty or `All` → both surfaces. `Production` → prod only. `Preview` → staging and local.
+ * Empty or `All` → both surfaces. `Production` → prod only. `Preview` / `Local` → staging and local.
  *
  * @param environmentCell - Value from the Environment column
  */
@@ -71,7 +71,7 @@ export function isVisibleOnCurrentSurface(environmentCell: unknown): boolean {
   if (isProductionSurface()) {
     return raw === 'production' || raw === 'prod'
   }
-  return raw === 'preview'
+  return raw === 'preview' || raw === 'local'
 }
 
 /**

@@ -55,4 +55,4 @@ export default async function StudioPage({
   )
 }
 
-export const revalidate = 60
+export const dynamic = 'force-dynamic'

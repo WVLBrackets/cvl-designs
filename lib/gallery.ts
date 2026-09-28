@@ -325,17 +325,20 @@ export async function fetchGalleryItems(includeDrafts = false): Promise<GalleryI
       .map(parseGalleryRow)
       .filter((item): item is GalleryItem => Boolean(item))
 
-    const recovered = await recoverMissingGalleryItems(allItems).catch((error) => {
-      console.error('[gallery] Blob recovery failed:', error)
-      return [] as GalleryItem[]
-    })
-    const combined = recovered.length > 0 ? [...recovered, ...allItems] : allItems
-    const seeded = await ensureReedyHocoGalleryItem(combined).catch((error) => {
-      console.error('[gallery] Reedy HOCO seed failed:', error)
-      return combined
-    })
+    let combined = allItems
+    if (includeDrafts) {
+      const recovered = await recoverMissingGalleryItems(allItems).catch((error) => {
+        console.error('[gallery] Blob recovery failed:', error)
+        return [] as GalleryItem[]
+      })
+      combined = recovered.length > 0 ? [...recovered, ...allItems] : allItems
+      combined = await ensureReedyHocoGalleryItem(combined).catch((error) => {
+        console.error('[gallery] Reedy HOCO seed failed:', error)
+        return combined
+      })
+    }
 
-    return seeded
+    return combined
       .filter((item) => isVisibleOnCurrentSurface(item.environment))
       .filter((item) => {
         if (includeDrafts) return true
