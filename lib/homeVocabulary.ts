@@ -3,8 +3,10 @@
  */
 
 export const HOME_LABELS = {
-  headerIcon: 'Header icon',
+  headerIcon: 'Header icon 1',
+  headerIcon2: 'Header icon 2',
   headerTitle: 'Header title',
+  headerHouse: 'House icon',
   navBalloons: 'Nav — Balloons',
   navBanners: 'Nav — Banners',
   navTeamStores: 'Nav — Team Stores',

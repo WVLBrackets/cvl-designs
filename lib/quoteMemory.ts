@@ -1,5 +1,6 @@
 /**
- * File-backed quote store when DATABASE_URL is not set (local and Preview/QA).
+ * File-backed quote store when DATABASE_URL is not set.
+ * Local and `vercel dev` only — never Preview or Production.
  */
 
 import fs from 'fs'
@@ -14,15 +15,35 @@ interface QuoteFile {
   quotes: StudioQuoteRecord[]
 }
 
-const dataFile = process.env.VERCEL
-  ? path.join('/tmp', 'cvl-quotes.json')
-  : path.join(process.cwd(), '.data', 'quotes.json')
+const dataFile = path.join(process.cwd(), '.data', 'quotes.json')
+
+/**
+ * True when this process is a Vercel Preview or Production deployment.
+ */
+function isHostedVercelSurface(): boolean {
+  const vercelEnv = process.env.VERCEL_ENV
+  return vercelEnv === 'preview' || vercelEnv === 'production'
+}
 
 /**
  * Whether this process should keep quotes in a JSON file instead of Neon.
+ * Hosted Preview/Production must use DATABASE_URL — a missing URL is a hard failure.
  */
 export function shouldUseMemoryQuotes(): boolean {
+  if (isHostedVercelSurface()) return false
   return !process.env.DATABASE_URL
+}
+
+/**
+ * Fail closed on Preview/Production when Postgres is not configured.
+ * Do not write quotes to a temp file that nobody will see.
+ */
+export function assertHostedQuotesDatabase(): void {
+  if (!isHostedVercelSurface()) return
+  if (process.env.DATABASE_URL) return
+  throw new Error(
+    `DATABASE_URL is required on ${process.env.VERCEL_ENV}. Quote storage does not fall back to JSON on Preview or Production.`
+  )
 }
 
 /**

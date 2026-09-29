@@ -2,6 +2,7 @@
  * Home Page - Order Placement Interface
  */
 
+import { redirect } from 'next/navigation'
 import { 
   fetchProducts, 
   fetchDesignOptions, 
@@ -23,10 +24,12 @@ export default async function Home({
   // Get store from URL query param
   const storeSlug = searchParams.store
 
-  // If no store is specified, we'll handle it on the client side
-  // (checking localStorage and redirecting if needed)
+  // Bare `/` is the marketing home. Team stores still use `/?store=…`.
   if (!storeSlug) {
-    return <OrderPageClient errorMessage={searchParams.error} />
+    if (searchParams.error) {
+      return <OrderPageClient errorMessage={searchParams.error} />
+    }
+    redirect('/home')
   }
 
   // Validate that the store exists

@@ -7,7 +7,7 @@ import { mkdir, writeFile } from 'fs/promises'
 import path from 'path'
 import { GALLERY_IMAGE_MAX_BYTES, GALLERY_IMAGE_TYPES, gallerySafeFileName, mimeFromFileName } from '@/lib/galleryMedia'
 
-export const QUOTE_PHOTO_FOLDERS = ['venue', 'inspiration'] as const
+export const QUOTE_PHOTO_FOLDERS = ['venue', 'inspiration', 'extra'] as const
 export type QuotePhotoFolder = (typeof QUOTE_PHOTO_FOLDERS)[number]
 
 /**

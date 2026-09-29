@@ -17,20 +17,6 @@ export default function OrderPageClient({ errorMessage }: { errorMessage?: strin
       return
     }
     
-    // Check localStorage for the current store
-    try {
-      const savedStore = localStorage.getItem('cvl-current-store')
-      
-      if (savedStore) {
-        // Redirect to the store page with the slug
-        router.push(`/?store=${savedStore}`)
-        return
-      }
-    } catch (error) {
-      console.error('Failed to check localStorage:', error)
-    }
-    
-    // No saved store found, redirect to home page
     router.push('/home')
   }, [router, errorMessage])
 

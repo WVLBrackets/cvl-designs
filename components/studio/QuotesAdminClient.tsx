@@ -2,17 +2,18 @@
 
 import { useMemo, useState } from 'react'
 import { QUOTE_STATUS_LABELS, quoteStatuses, type QuoteStatus, type StudioQuoteRecord } from '@/lib/quoteTypes'
-import { QUOTE_FIELD_DEFS } from '@/lib/quoteForm'
+import { fieldKind, fieldOptions, orderedQuoteDefs, parseChoiceList, parsePhotoList, type QuoteFormSettings } from '@/lib/quoteForm'
 import Link from 'next/link'
 
 interface QuotesAdminClientProps {
   initialItems: StudioQuoteRecord[]
+  form: QuoteFormSettings
 }
 
 /**
  * Admin list and detail editor for studio quote requests.
  */
-export default function QuotesAdminClient({ initialItems }: QuotesAdminClientProps) {
+export default function QuotesAdminClient({ initialItems, form }: QuotesAdminClientProps) {
   const [items, setItems] = useState(initialItems)
   const [selectedId, setSelectedId] = useState(initialItems[0]?.id || '')
   const [error, setError] = useState('')
@@ -139,13 +140,24 @@ export default function QuotesAdminClient({ initialItems }: QuotesAdminClientPro
                 <dt className="font-medium text-gray-600">Submitted</dt>
                 <dd>{new Date(selected.createdAt).toLocaleString()}</dd>
               </div>
-              {QUOTE_FIELD_DEFS.filter((field) => field.key !== 'firstName' && field.key !== 'lastName').map((field) => {
-                if (field.kind === 'photos') {
-                  const urls = field.key === 'venuePhotos' ? selected.venuePhotos : selected.inspirationPhotos
+              {orderedQuoteDefs(form)
+                .filter((field) => field.key !== 'firstName' && field.key !== 'lastName')
+                .map((field) => {
+                const settings = form.fields[field.key]
+                const kind = settings ? fieldKind(field, settings) : field.kind
+                const options = settings ? fieldOptions(field, settings) : field.options
+                const label = settings?.label || field.defaultLabel
+                if (kind === 'photos') {
+                  const urls =
+                    field.key === 'venuePhotos'
+                      ? selected.venuePhotos
+                      : field.key === 'inspirationPhotos'
+                        ? selected.inspirationPhotos
+                        : parsePhotoList(selected[field.key])
                   if (!urls?.length) return null
                   return (
                     <div key={field.key} className="sm:col-span-2">
-                      <dt className="font-medium text-gray-600">{field.defaultLabel}</dt>
+                      <dt className="font-medium text-gray-600">{label}</dt>
                       <dd className="mt-1 flex flex-wrap gap-2">
                         {urls.map((url) => (
                           <a key={url} href={url} target="_blank" rel="noreferrer">
@@ -160,12 +172,16 @@ export default function QuotesAdminClient({ initialItems }: QuotesAdminClientPro
                 const raw =
                   field.key === 'interests'
                     ? selected.interests.join(', ')
-                    : String(selected[field.key] || '')
+                    : kind === 'checkbox'
+                      ? parseChoiceList(selected[field.key]).join(', ')
+                      : Array.isArray(selected[field.key])
+                        ? (selected[field.key] as string[]).join(', ')
+                        : String(selected[field.key] || '')
                 if (!raw) return null
-                const option = field.options?.find((item) => item.value === raw)
+                const option = options?.find((item) => item.value === raw)
                 return (
-                  <div key={field.key} className={field.kind === 'textarea' ? 'sm:col-span-2' : undefined}>
-                    <dt className="font-medium text-gray-600">{field.defaultLabel}</dt>
+                  <div key={field.key} className={kind === 'textarea' ? 'sm:col-span-2' : undefined}>
+                    <dt className="font-medium text-gray-600">{label}</dt>
                     <dd className="whitespace-pre-wrap">
                       {field.key === 'email' ? (
                         <a className="home-accent underline" href={`mailto:${raw}`}>

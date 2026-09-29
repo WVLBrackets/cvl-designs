@@ -3,8 +3,16 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import {
-  QUOTE_FIELD_DEFS,
-  QUOTE_FIELD_GROUPS,
+  createCustomQuoteKey,
+  fieldKind,
+  fieldOptions,
+  isCustomQuoteKey,
+  orderedQuoteDefs,
+  QUOTE_ADMIN_KINDS,
+  QUOTE_KIND_LABELS,
+  type QuoteFieldDef,
+  type QuoteFieldKind,
+  type QuoteFieldOption,
   type QuoteFieldSettings,
   type QuoteFormSettings,
   type QuoteWhen,
@@ -15,13 +23,15 @@ interface QuoteFormAdminClientProps {
 }
 
 /**
- * Edit quote form title, intro, and per-question visibility / required / condition.
+ * Edit quote form questions: type, options, required, order, and custom fields.
  */
 export default function QuoteFormAdminClient({ initialSettings }: QuoteFormAdminClientProps) {
   const [settings, setSettings] = useState(initialSettings)
   const [error, setError] = useState('')
   const [status, setStatus] = useState('')
   const [pending, setPending] = useState(false)
+
+  const defs = orderedQuoteDefs(settings)
 
   /**
    * Patch one field's admin flags.
@@ -37,6 +47,86 @@ export default function QuoteFormAdminClient({ initialSettings }: QuoteFormAdmin
         [key]: { ...current.fields[key], ...patch },
       },
     }))
+  }
+
+  /**
+   * Move a question one step in the form order.
+   *
+   * @param index - Current index
+   * @param direction - Up or down
+   */
+  function moveField(index: number, direction: -1 | 1) {
+    const next = index + direction
+    if (next < 0 || next >= defs.length) return
+    const order = defs.map((item) => item.key)
+    const swap = order[index]
+    order[index] = order[next]
+    order[next] = swap
+    setSettings((current) => ({ ...current, fieldOrder: order }))
+  }
+
+  /**
+   * Append a new custom question.
+   */
+  function addQuestion() {
+    const key = createCustomQuoteKey()
+    const def: QuoteFieldDef = {
+      key,
+      group: 'extra',
+      kind: 'text',
+      defaultLabel: 'New question',
+      defaultHelp: '',
+      defaultWhen: 'all',
+      defaultVisible: true,
+      defaultRequired: false,
+      maxLength: 200,
+      custom: true,
+    }
+    setSettings((current) => ({
+      ...current,
+      customFields: [...current.customFields, def],
+      fieldOrder: [...orderedQuoteDefs(current).map((item) => item.key), key],
+      fields: {
+        ...current.fields,
+        [key]: {
+          visible: true,
+          required: false,
+          when: 'all',
+          label: 'New question',
+          help: '',
+          kind: 'text',
+          options: [],
+        },
+      },
+    }))
+  }
+
+  /**
+   * Remove an admin-created question.
+   *
+   * @param key - Custom field key
+   */
+  function removeQuestion(key: string) {
+    setSettings((current) => {
+      const fields = { ...current.fields }
+      delete fields[key]
+      return {
+        ...current,
+        customFields: current.customFields.filter((item) => item.key !== key),
+        fieldOrder: current.fieldOrder.filter((item) => item !== key),
+        fields,
+      }
+    })
+  }
+
+  /**
+   * Replace option list for a dropdown / choice field.
+   *
+   * @param key - Field key
+   * @param options - Next options
+   */
+  function setOptions(key: string, options: QuoteFieldOption[]) {
+    patchField(key, { options })
   }
 
   async function handleSave() {
@@ -68,8 +158,8 @@ export default function QuoteFormAdminClient({ initialSettings }: QuoteFormAdmin
         <div>
           <h1 className="font-serif text-3xl font-semibold home-text">Quote form</h1>
           <p className="mt-2 text-sm home-text-muted">
-            Show, hide, or require questions. Conditional questions only appear for balloons or banners.
-            Hidden questions still have a column so you can turn them on later.
+            Reorder questions, choose a field type, and make any field optional. Custom questions are stored as JSON
+            on each quote, so they do not require a new database column.
           </p>
         </div>
         <Link href="/admin/quotes" className="text-sm font-semibold home-accent underline">
@@ -97,24 +187,42 @@ export default function QuoteFormAdminClient({ initialSettings }: QuoteFormAdmin
         </label>
       </div>
 
-      {QUOTE_FIELD_GROUPS.map((group) => (
-        <section key={group.id} className="mt-8">
-          <h2 className="text-sm font-bold uppercase tracking-wide home-text">{group.label}</h2>
-          <div className="mt-3 space-y-3">
-            {QUOTE_FIELD_DEFS.filter((field) => field.group === group.id).map((field) => {
-              const row = settings.fields[field.key]
-              const locked = Boolean(field.locked)
-              return (
-                <div key={field.key} className="rounded-xl border home-border home-bg-2 p-4">
-                  <div className="flex flex-wrap items-start justify-between gap-2">
-                    <div>
-                      <p className="font-semibold home-text">{row.label}</p>
-                      <p className="text-xs home-text-muted">{field.key}</p>
-                    </div>
-                    {locked ? (
-                      <p className="text-xs font-medium text-yellow-900">Always shown, always required</p>
-                    ) : null}
-                  </div>
+      <div className="mt-8 space-y-3">
+        {defs.map((field, index) => {
+          const row = settings.fields[field.key]
+          if (!row) return null
+          const kind = fieldKind(field, row)
+          const options = fieldOptions(field, row)
+          const needsOptions = kind === 'select' || kind === 'radio' || kind === 'checkbox'
+          const custom = isCustomQuoteKey(field.key)
+          return (
+            <div key={field.key} className="rounded-xl border home-border home-bg-2 p-4">
+              <div className="flex items-start gap-3">
+                <div className="flex flex-col gap-1 pt-1">
+                  {index > 0 ? (
+                    <button
+                      type="button"
+                      aria-label={`Move ${row.label} up`}
+                      className="inline-flex h-8 w-8 items-center justify-center rounded-md border home-border text-sm"
+                      onClick={() => moveField(index, -1)}
+                    >
+                      ↑
+                    </button>
+                  ) : null}
+                  {index < defs.length - 1 ? (
+                    <button
+                      type="button"
+                      aria-label={`Move ${row.label} down`}
+                      className="inline-flex h-8 w-8 items-center justify-center rounded-md border home-border text-sm"
+                      onClick={() => moveField(index, 1)}
+                    >
+                      ↓
+                    </button>
+                  ) : null}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="font-semibold home-text">{row.label}</p>
+                  <p className="text-xs home-text-muted">{field.key}</p>
                   <div className="mt-3 grid gap-3 sm:grid-cols-2">
                     <label className="block text-sm font-medium text-gray-700">
                       Label
@@ -132,13 +240,83 @@ export default function QuoteFormAdminClient({ initialSettings }: QuoteFormAdmin
                         className="mt-1 w-full rounded-md border home-border home-bg px-3 py-2"
                       />
                     </label>
+                    <label className="block text-sm font-medium text-gray-700">
+                      Field type
+                      <select
+                        value={kind}
+                        disabled={field.kind === 'interests'}
+                        onChange={(event) =>
+                          patchField(field.key, { kind: event.target.value as QuoteFieldKind })
+                        }
+                        className="mt-1 w-full rounded-md border home-border home-bg px-3 py-2"
+                      >
+                        {field.kind === 'interests' ? (
+                          <option value="interests">{QUOTE_KIND_LABELS.interests}</option>
+                        ) : (
+                          QUOTE_ADMIN_KINDS.map((item) => (
+                            <option key={item} value={item}>
+                              {QUOTE_KIND_LABELS[item]}
+                            </option>
+                          ))
+                        )}
+                      </select>
+                    </label>
                   </div>
+                  {needsOptions ? (
+                    <div className="mt-3 rounded-lg border home-border p-3">
+                      <p className="text-sm font-medium text-gray-700">List values</p>
+                      <div className="mt-2 space-y-2">
+                        {options.map((option, optionIndex) => (
+                          <div key={`${option.value}-${optionIndex}`} className="flex gap-2">
+                            <input
+                              value={option.label}
+                              onChange={(event) => {
+                                const next = options.map((item, i) =>
+                                  i === optionIndex
+                                    ? {
+                                        label: event.target.value,
+                                        value: item.value || slugValue(event.target.value),
+                                      }
+                                    : item
+                                )
+                                setOptions(field.key, next)
+                              }}
+                              className="w-full rounded-md border home-border home-bg px-3 py-2 text-sm"
+                            />
+                            <button
+                              type="button"
+                              className="text-sm home-accent underline"
+                              onClick={() =>
+                                setOptions(
+                                  field.key,
+                                  options.filter((_, i) => i !== optionIndex)
+                                )
+                              }
+                            >
+                              Remove
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                      <button
+                        type="button"
+                        className="mt-2 text-sm font-semibold home-accent underline"
+                        onClick={() =>
+                          setOptions(field.key, [
+                            ...options,
+                            { value: `option-${options.length + 1}`, label: `Option ${options.length + 1}` },
+                          ])
+                        }
+                      >
+                        Add value
+                      </button>
+                    </div>
+                  ) : null}
                   <div className="mt-3 flex flex-wrap gap-4 text-sm">
                     <label className="inline-flex min-h-9 items-center gap-2">
                       <input
                         type="checkbox"
                         checked={row.visible}
-                        disabled={locked}
                         onChange={(event) => patchField(field.key, { visible: event.target.checked })}
                       />
                       Show this question
@@ -147,7 +325,6 @@ export default function QuoteFormAdminClient({ initialSettings }: QuoteFormAdmin
                       <input
                         type="checkbox"
                         checked={row.required}
-                        disabled={locked}
                         onChange={(event) => patchField(field.key, { required: event.target.checked })}
                       />
                       Required
@@ -156,7 +333,6 @@ export default function QuoteFormAdminClient({ initialSettings }: QuoteFormAdmin
                       Show for
                       <select
                         value={row.when}
-                        disabled={locked}
                         onChange={(event) => patchField(field.key, { when: event.target.value as QuoteWhen })}
                         className="rounded-md border home-border home-bg px-2 py-1"
                       >
@@ -165,13 +341,30 @@ export default function QuoteFormAdminClient({ initialSettings }: QuoteFormAdmin
                         <option value="banners">Banners only</option>
                       </select>
                     </label>
+                    {custom ? (
+                      <button
+                        type="button"
+                        className="text-sm text-red-700 underline"
+                        onClick={() => removeQuestion(field.key)}
+                      >
+                        Delete question
+                      </button>
+                    ) : null}
                   </div>
                 </div>
-              )
-            })}
-          </div>
-        </section>
-      ))}
+              </div>
+            </div>
+          )
+        })}
+      </div>
+
+      <button
+        type="button"
+        onClick={addQuestion}
+        className="mt-4 text-sm font-semibold home-accent underline"
+      >
+        Add a question
+      </button>
 
       <div className="sticky bottom-0 mt-8 border-t home-border bg-white/95 py-4">
         <div className="flex flex-wrap items-center gap-3">
@@ -192,5 +385,20 @@ export default function QuoteFormAdminClient({ initialSettings }: QuoteFormAdmin
         </div>
       </div>
     </div>
+  )
+}
+
+/**
+ * Stable option value from a label.
+ *
+ * @param label - Display text
+ */
+function slugValue(label: string): string {
+  return (
+    label
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '')
+      .slice(0, 40) || 'option'
   )
 }

@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { Suspense, type ReactNode } from 'react'
 import SiteFooter from '@/components/home/SiteFooter'
 import SiteHeader from '@/components/home/SiteHeader'
 import HomeBrandShell from '@/components/home/HomeBrandShell'
@@ -26,7 +26,9 @@ export default function MarketingChrome({
       >
         Skip to content
       </a>
-      <SiteHeader content={content} showAdminLink={showAdminLink} />
+      <Suspense fallback={null}>
+        <SiteHeader content={content} showAdminLink={showAdminLink} />
+      </Suspense>
       {children}
       <SiteFooter content={content} />
     </HomeBrandShell>

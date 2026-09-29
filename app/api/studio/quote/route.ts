@@ -10,10 +10,15 @@ import { getRuntimeSurface } from '@/lib/config'
 import { logEmailError, logError } from '@/lib/errorLogger'
 import { checkRateLimit, getClientIP, QUOTE_RATE_LIMIT, getRateLimitHeaders } from '@/lib/rateLimit'
 import {
+  fieldKind,
+  fieldOptions,
   mergeQuoteFormSettings,
-  QUOTE_FIELD_DEFS,
+  orderedQuoteDefs,
+  parseChoiceList,
+  parsePhotoList,
   validateQuoteSubmission,
 } from '@/lib/quoteForm'
+import type { QuoteFormSettings } from '@/lib/quoteForm'
 import type { StudioQuoteRecord } from '@/lib/quoteTypes'
 
 function escapeHtml(value: string): string {
@@ -30,18 +35,25 @@ function escapeHtml(value: string): string {
  * @param record - Saved quote
  * @param key - Field key
  */
-function displayValue(record: StudioQuoteRecord, key: string): string {
-  const def = QUOTE_FIELD_DEFS.find((field) => field.key === key)
+function displayValue(record: StudioQuoteRecord, key: string, formLabel?: { kind: string; options?: { value: string; label: string }[] }): string {
   if (key === 'interests') {
     return (record.interests || []).join(', ')
   }
-  if (key === 'venuePhotos' || key === 'inspirationPhotos') {
-    const list = key === 'venuePhotos' ? record.venuePhotos : record.inspirationPhotos
+  if (key === 'venuePhotos' || key === 'inspirationPhotos' || formLabel?.kind === 'photos') {
+    const list =
+      key === 'venuePhotos'
+        ? record.venuePhotos
+        : key === 'inspirationPhotos'
+          ? record.inspirationPhotos
+          : parsePhotoList(record[key])
     return (list || []).join('\n')
   }
-  const raw = String(record[key] || '')
+  if (formLabel?.kind === 'checkbox') {
+    return parseChoiceList(record[key]).join(', ')
+  }
+  const raw = Array.isArray(record[key]) ? (record[key] as string[]).join(', ') : String(record[key] || '')
   if (!raw) return ''
-  const option = def?.options?.find((item) => item.value === raw)
+  const option = formLabel?.options?.find((item) => item.value === raw)
   return option?.label || raw
 }
 
@@ -49,8 +61,9 @@ function displayValue(record: StudioQuoteRecord, key: string): string {
  * Build a simple HTML summary of a quote for Gmail.
  *
  * @param record - Saved quote
+ * @param form - Live form settings
  */
-function quoteEmailHtml(record: StudioQuoteRecord): string {
+function quoteEmailHtml(record: StudioQuoteRecord, form: QuoteFormSettings): string {
   const surface = record.surface
   const banner =
     surface === 'production'
@@ -62,10 +75,15 @@ function quoteEmailHtml(record: StudioQuoteRecord): string {
       ? `<p style="margin:6px 0;"><strong>${escapeHtml(label)}:</strong> ${escapeHtml(value).replace(/\n/g, '<br/>')}</p>`
       : ''
 
-  const body = QUOTE_FIELD_DEFS.map((def) => {
-    if (def.key === 'firstName' || def.key === 'lastName') return ''
-    return row(def.defaultLabel, displayValue(record, def.key))
-  }).join('')
+  const body = orderedQuoteDefs(form)
+    .map((def) => {
+      if (def.key === 'firstName' || def.key === 'lastName') return ''
+      const settings = form.fields[def.key]
+      const kind = settings ? fieldKind(def, settings) : def.kind
+      const options = settings ? fieldOptions(def, settings) : def.options
+      return row(settings?.label || def.defaultLabel, displayValue(record, def.key, { kind, options }))
+    })
+    .join('')
 
   return `
     ${banner}
@@ -116,23 +134,25 @@ export async function POST(request: NextRequest) {
       ''
 
     const subject = `[${getRuntimeSurface().toUpperCase()}] Studio quote ${record.id} from ${record.firstName} ${record.lastName}`
-    const html = quoteEmailHtml(record)
+    const html = quoteEmailHtml(record, form)
 
     try {
       if (ownerEmail) {
         await sendEmail({ to: ownerEmail, subject, html })
       }
-      await sendEmail({
-        to: record.email,
-        subject: 'We received your quote request',
-        html: `
+      if (record.email) {
+        await sendEmail({
+          to: record.email,
+          subject: 'We received your quote request',
+          html: `
           <div style="font-family:Arial,sans-serif;padding:16px;color:#111">
-            <p>Hi ${escapeHtml(record.firstName)},</p>
+            <p>Hi ${escapeHtml(record.firstName || 'there')},</p>
             <p>Thanks for requesting a quote. Caryn will review the details and get back to you.</p>
-            ${quoteEmailHtml(record)}
+            ${quoteEmailHtml(record, form)}
           </div>
         `,
-      })
+        })
+      }
     } catch (emailError) {
       console.error('[api/studio/quote] Email failed (quote was saved):', emailError)
       await logEmailError(ownerEmail || record.email, subject, emailError)

@@ -8,9 +8,18 @@ import { getDb } from '@/db'
 import { quotes, type QuoteRow, type QuoteStatus } from '@/db/schema'
 import { ensureQuoteTables } from '@/db/ensure'
 import { generateQuoteId } from '@/lib/quoteNumber'
-import { listMemoryQuotes, saveMemoryQuote, shouldUseMemoryQuotes, updateMemoryQuote } from '@/lib/quoteMemory'
+import {
+  assertHostedQuotesDatabase,
+  listMemoryQuotes,
+  saveMemoryQuote,
+  shouldUseMemoryQuotes,
+  updateMemoryQuote,
+} from '@/lib/quoteMemory'
 import {
   emptyQuoteAnswers,
+  extraAnswersPayload,
+  isCustomQuoteKey,
+  parseChoiceList,
   parsePhotoList,
   type QuoteAnswers,
 } from '@/lib/quoteForm'
@@ -100,7 +109,28 @@ export function toStudioQuoteRecord(row: QuoteRow): StudioQuoteRecord {
     adminNotes: cell(row, 'adminNotes'),
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
+    ...parseStoredExtraAnswers(cell(row, 'extraAnswers')),
   })
+}
+
+/**
+ * Parse extra_answers JSON from Postgres.
+ *
+ * @param raw - Column text
+ */
+function parseStoredExtraAnswers(raw: string): Record<string, string | string[]> {
+  try {
+    const parsed = JSON.parse(raw || '{}') as unknown
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {}
+    const extra: Record<string, string | string[]> = {}
+    for (const [key, value] of Object.entries(parsed as Record<string, unknown>)) {
+      if (!isCustomQuoteKey(key)) continue
+      extra[key] = Array.isArray(value) ? parseChoiceList(value) : String(value || '')
+    }
+    return extra
+  } catch {
+    return {}
+  }
 }
 
 /**
@@ -109,7 +139,11 @@ export function toStudioQuoteRecord(row: QuoteRow): StudioQuoteRecord {
  * @param input - Quote answers
  */
 export function quoteAnswerColumns(input: QuoteAnswers) {
-  const str = (key: string) => String(input[key] || '')
+  const str = (key: string) => {
+    const value = input[key]
+    if (Array.isArray(value)) return JSON.stringify(value)
+    return String(value || '')
+  }
   const photos = (key: string) => JSON.stringify(parsePhotoList(input[key]))
   const interests = Array.isArray(input.interests)
     ? input.interests.filter((item) => item === 'balloons' || item === 'banners')
@@ -146,6 +180,7 @@ export function quoteAnswerColumns(input: QuoteAnswers) {
     inspirationPhotos: photos('inspirationPhotos'),
     socialPosting: str('socialPosting'),
     howHeard: str('howHeard'),
+    extraAnswers: JSON.stringify(extraAnswersPayload(input)),
   }
 }
 
@@ -155,8 +190,9 @@ export function quoteAnswerColumns(input: QuoteAnswers) {
  * @param input - Validated quote fields
  */
 export async function saveStudioQuote(input: StudioQuoteInput): Promise<StudioQuoteRecord> {
+  assertHostedQuotesDatabase()
   if (shouldUseMemoryQuotes()) {
-    console.warn('[quotes] DATABASE_URL is not set; storing this quote in a JSON file (local or Preview)')
+    console.warn('[quotes] DATABASE_URL is not set; storing this quote in local .data/quotes.json')
     return saveMemoryQuote(input)
   }
   await ensureQuoteTables()
@@ -183,6 +219,7 @@ export async function saveStudioQuote(input: StudioQuoteInput): Promise<StudioQu
  * List quotes newest first for admin.
  */
 export async function listStudioQuotes(): Promise<StudioQuoteRecord[]> {
+  assertHostedQuotesDatabase()
   if (shouldUseMemoryQuotes()) {
     return listMemoryQuotes()
   }
@@ -202,6 +239,7 @@ export async function updateStudioQuote(
   id: string,
   patch: { status?: QuoteStatus; adminNotes?: string }
 ): Promise<StudioQuoteRecord | null> {
+  assertHostedQuotesDatabase()
   if (shouldUseMemoryQuotes()) {
     return updateMemoryQuote(id, patch)
   }

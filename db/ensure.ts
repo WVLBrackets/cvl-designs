@@ -52,6 +52,7 @@ export async function ensureQuoteTables(): Promise<void> {
   for (const column of EXTRA_COLUMNS) {
     await db.execute(sql.raw(`ALTER TABLE quotes ADD COLUMN IF NOT EXISTS ${column} text NOT NULL DEFAULT ''`))
   }
+  await db.execute(sql.raw(`ALTER TABLE quotes ADD COLUMN IF NOT EXISTS extra_answers text NOT NULL DEFAULT '{}'`))
   await db.execute(sql`
     CREATE TABLE IF NOT EXISTS quote_daily_counters (
       surface text NOT NULL,

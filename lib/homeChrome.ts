@@ -119,3 +119,27 @@ export function footerNavSlots(content: HomeContent): ChromeLinkSlot[] {
 
 export const ADMIN_NAV_HELP =
   'Admin only appears in the header when you are signed in. Visitors never see it. It always opens Admin home and cannot be renamed or moved.'
+
+/**
+ * Whether a header nav destination matches the current page.
+ *
+ * @param href - Stored nav href
+ * @param pathname - Current path
+ * @param search - Current query string, with or without `?`
+ */
+export function navHrefIsActive(href: string, pathname: string, search: string, hash = ''): boolean {
+  const [pathAndQuery, hashPart] = href.split('#')
+  const [pathPart, queryPart] = (pathAndQuery || '/').split('?')
+  const path = pathPart || '/'
+  if (path !== pathname) return false
+  if (hashPart) {
+    const currentHash = hash.startsWith('#') ? hash.slice(1) : hash
+    return currentHash === hashPart
+  }
+  const want = new URLSearchParams(queryPart || '')
+  const have = new URLSearchParams(search.startsWith('?') ? search.slice(1) : search)
+  const category = want.get('category')
+  if (category) return have.get('category') === category
+  if (pathname === '/studio') return !have.get('category')
+  return true
+}

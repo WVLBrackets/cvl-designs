@@ -7,7 +7,7 @@ import { QUOTE_PHOTO_MAX } from '@/lib/quoteForm'
 interface QuotePhotoFieldProps {
   label: string
   help?: string
-  folder: 'venue' | 'inspiration'
+  folder: 'venue' | 'inspiration' | 'extra'
   urls: string[]
   onChange: (urls: string[]) => void
 }

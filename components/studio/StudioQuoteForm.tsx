@@ -5,9 +5,12 @@ import Link from 'next/link'
 import QuotePhotoField from '@/components/studio/QuotePhotoField'
 import { STUDIO_ROUTE } from '@/lib/studio'
 import {
+  fieldKind,
+  fieldOptions,
   isQuoteFieldRequired,
   isQuoteFieldShown,
-  QUOTE_FIELD_DEFS,
+  orderedQuoteDefs,
+  parseChoiceList,
   type QuoteFieldDef,
   type QuoteFormSettings,
 } from '@/lib/quoteForm'
@@ -20,17 +23,16 @@ interface StudioQuoteFormProps {
 const inputClass =
   'w-full px-3 py-2 rounded-md border home-border home-bg focus:outline-none focus:ring-2'
 
-const CONTACT_KEYS = ['firstName', 'lastName', 'email', 'phone']
-
 /**
  * Public form to request a balloons and banners quote.
  */
 export default function StudioQuoteForm({ form }: StudioQuoteFormProps) {
+  const defs = useMemo(() => orderedQuoteDefs(form), [form])
   const [values, setValues] = useState<Record<string, string>>({})
   const [balloons, setBalloons] = useState(false)
   const [banners, setBanners] = useState(false)
-  const [venuePhotos, setVenuePhotos] = useState<string[]>([])
-  const [inspirationPhotos, setInspirationPhotos] = useState<string[]>([])
+  const [photoValues, setPhotoValues] = useState<Record<string, string[]>>({})
+  const [checkboxValues, setCheckboxValues] = useState<Record<string, string[]>>({})
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [submittedId, setSubmittedId] = useState('')
@@ -57,7 +59,7 @@ export default function StudioQuoteForm({ form }: StudioQuoteFormProps) {
     setError('')
     setSubmitting(true)
     try {
-      const payload: Record<string, unknown> = { ...values, interests, venuePhotos, inspirationPhotos }
+      const payload: Record<string, unknown> = { ...values, interests, ...photoValues, ...checkboxValues }
       const response = await fetch('/api/studio/quote', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -87,8 +89,10 @@ export default function StudioQuoteForm({ form }: StudioQuoteFormProps) {
     const required = isQuoteFieldRequired(settings, interests)
     const label = `${settings.label}${required ? ' *' : ''}`
     const value = values[def.key] || ''
+    const kind = fieldKind(def, settings)
+    const options = fieldOptions(def, settings)
 
-    if (def.kind === 'interests') {
+    if (kind === 'interests') {
       return (
         <fieldset key={def.key}>
           <legend className="text-sm font-medium text-gray-700 mb-2">{label}</legend>
@@ -117,20 +121,49 @@ export default function StudioQuoteForm({ form }: StudioQuoteFormProps) {
       )
     }
 
-    if (def.kind === 'photos') {
+    if (kind === 'photos') {
+      const folder =
+        def.key === 'venuePhotos' ? 'venue' : def.key === 'inspirationPhotos' ? 'inspiration' : 'extra'
       return (
         <QuotePhotoField
           key={def.key}
           label={label}
           help={settings.help}
-          folder={def.key === 'venuePhotos' ? 'venue' : 'inspiration'}
-          urls={def.key === 'venuePhotos' ? venuePhotos : inspirationPhotos}
-          onChange={def.key === 'venuePhotos' ? setVenuePhotos : setInspirationPhotos}
+          folder={folder}
+          urls={photoValues[def.key] || []}
+          onChange={(urls) => setPhotoValues((current) => ({ ...current, [def.key]: urls }))}
         />
       )
     }
 
-    if (def.kind === 'textarea') {
+    if (kind === 'checkbox') {
+      const selected = checkboxValues[def.key] || parseChoiceList(value)
+      return (
+        <fieldset key={def.key}>
+          <legend className="text-sm font-medium text-gray-700">{label}</legend>
+          {settings.help ? <p className="text-sm home-text-muted">{settings.help}</p> : null}
+          <div className="mt-2 space-y-2">
+            {options.map((option) => (
+              <label key={option.value} className="flex items-center gap-2 text-sm text-gray-800">
+                <input
+                  type="checkbox"
+                  checked={selected.includes(option.value)}
+                  onChange={(event) => {
+                    const next = event.target.checked
+                      ? [...selected, option.value]
+                      : selected.filter((item) => item !== option.value)
+                    setCheckboxValues((current) => ({ ...current, [def.key]: next }))
+                  }}
+                />
+                {option.label}
+              </label>
+            ))}
+          </div>
+        </fieldset>
+      )
+    }
+
+    if (kind === 'textarea') {
       return (
         <label key={def.key} className="block text-sm font-medium text-gray-700">
           {label}
@@ -147,7 +180,7 @@ export default function StudioQuoteForm({ form }: StudioQuoteFormProps) {
       )
     }
 
-    if (def.kind === 'select') {
+    if (kind === 'select') {
       return (
         <label key={def.key} className="block text-sm font-medium text-gray-700">
           {label}
@@ -159,7 +192,7 @@ export default function StudioQuoteForm({ form }: StudioQuoteFormProps) {
             className={`${inputClass} mt-1`}
           >
             <option value="">{required ? 'Please choose' : 'Optional'}</option>
-            {(def.options || []).map((option) => (
+            {options.map((option) => (
               <option key={option.value} value={option.value}>
                 {option.label}
               </option>
@@ -169,13 +202,13 @@ export default function StudioQuoteForm({ form }: StudioQuoteFormProps) {
       )
     }
 
-    if (def.kind === 'radio') {
+    if (kind === 'radio') {
       return (
         <fieldset key={def.key}>
           <legend className="text-sm font-medium text-gray-700">{label}</legend>
           {settings.help ? <p className="text-sm home-text-muted">{settings.help}</p> : null}
           <div className="mt-2 space-y-2">
-            {(def.options || []).map((option) => (
+            {options.map((option) => (
               <label key={option.value} className="flex items-center gap-2 text-sm text-gray-800">
                 <input
                   type="radio"
@@ -194,7 +227,15 @@ export default function StudioQuoteForm({ form }: StudioQuoteFormProps) {
     }
 
     const inputType =
-      def.kind === 'date' ? 'date' : def.key === 'email' ? 'email' : def.key === 'phone' ? 'tel' : 'text'
+      kind === 'date'
+        ? 'date'
+        : kind === 'datetime'
+          ? 'datetime-local'
+          : def.key === 'email'
+            ? 'email'
+            : def.key === 'phone'
+              ? 'tel'
+              : 'text'
     return (
       <label key={def.key} className="block text-sm font-medium text-gray-700">
         {label}
@@ -253,16 +294,12 @@ export default function StudioQuoteForm({ form }: StudioQuoteFormProps) {
     )
   }
 
-  const contactDefs = QUOTE_FIELD_DEFS.filter((field) => CONTACT_KEYS.includes(field.key))
-  const restDefs = QUOTE_FIELD_DEFS.filter((field) => !CONTACT_KEYS.includes(field.key))
-
   return (
     <form onSubmit={onSubmit} className="space-y-4 rounded-2xl border home-border home-bg-2 p-5 shadow-sm sm:p-8">
       <h1 className="font-serif text-2xl font-semibold home-text sm:text-3xl">{form.title}</h1>
       {form.intro ? <p className="text-sm home-text-muted sm:text-base">{form.intro}</p> : null}
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">{contactDefs.map((def) => renderField(def))}</div>
-      {restDefs.map((def) => renderField(def))}
+      {defs.map((def) => renderField(def))}
 
       {error ? (
         <p className="text-sm text-red-600" role="alert">

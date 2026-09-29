@@ -48,6 +48,7 @@ export const quotes = pgTable('quotes', {
   inspirationPhotos: text('inspiration_photos').notNull().default(''),
   socialPosting: text('social_posting').notNull().default(''),
   howHeard: text('how_heard').notNull().default(''),
+  extraAnswers: text('extra_answers').notNull().default('{}'),
   status: quoteStatusEnum('status').notNull().default('new'),
   adminNotes: text('admin_notes').notNull().default(''),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),

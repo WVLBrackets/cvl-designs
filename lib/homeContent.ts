@@ -36,6 +36,9 @@ export interface HomeOffering {
 export interface HomeContent {
   headerTitle: string
   headerLogoSrc: string
+  headerLogo2Src: string
+  showHeaderIcon2: boolean
+  showHeaderHouse: boolean
   navBalloons: string
   navBalloonsHref: string
   navBanners: string
@@ -145,6 +148,9 @@ const offeringSchema = z.object({
 const homeContentSchema = z.object({
   headerTitle: z.string().max(80),
   headerLogoSrc: z.string().max(2000),
+  headerLogo2Src: z.string().max(2000).optional(),
+  showHeaderIcon2: z.boolean().optional(),
+  showHeaderHouse: z.boolean().optional(),
   navBalloons: z.string().max(40),
   navBalloonsHref: z.string().max(200).optional(),
   navBanners: z.string().max(40),
@@ -248,6 +254,9 @@ export function defaultHomeContent(): HomeContent {
   return {
     headerTitle: 'CVL Designs',
     headerLogoSrc: '/images/brand/VL Design Logo - Trimmed.png',
+    headerLogo2Src: '/images/home/header-icon-2-wordmark.png',
+    showHeaderIcon2: true,
+    showHeaderHouse: true,
     navBalloons: 'Balloons',
     navBalloonsHref: BALLOONS_ROUTE,
     navBanners: 'Banners',
@@ -509,6 +518,11 @@ export function normalizeHomeContent(raw: unknown): HomeContent {
     headerLogoSrc: isAllowedHomeImageSrc(input.headerLogoSrc || '')
       ? (input.headerLogoSrc as string)
       : defaults.headerLogoSrc,
+    headerLogo2Src: isAllowedHomeImageSrc(input.headerLogo2Src || '')
+      ? (input.headerLogo2Src as string)
+      : defaults.headerLogo2Src,
+    showHeaderIcon2: input.showHeaderIcon2 !== false,
+    showHeaderHouse: input.showHeaderHouse !== false,
     heroImageSrc: isAllowedHomeImageSrc(input.heroImageSrc || '')
       ? (input.heroImageSrc as string)
       : defaults.heroImageSrc,
@@ -614,6 +628,9 @@ export function parseHomeContentPayload(raw: unknown): HomeContent {
   const normalized = normalizeHomeContent(parsed)
   if (!isAllowedHomeImageSrc(normalized.headerLogoSrc)) {
     throw new Error('Header logo path is not allowed')
+  }
+  if (!isAllowedHomeImageSrc(normalized.headerLogo2Src)) {
+    throw new Error('Header icon 2 path is not allowed')
   }
   if (!isAllowedHomeImageSrc(normalized.heroImageSrc)) {
     throw new Error('Hero image path is not allowed')

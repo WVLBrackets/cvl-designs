@@ -6,6 +6,7 @@ import { redirect } from 'next/navigation'
 import { fetchConfiguration } from '@/lib/googleSheets'
 import { hasAdminSession } from '@/lib/adminSession'
 import { mergeHomeContent } from '@/lib/homeContent'
+import { mergeQuoteFormSettings } from '@/lib/quoteForm'
 import { listStudioQuotes } from '@/lib/studioQuote'
 import AdminEditorShell from '@/components/home/AdminEditorShell'
 import QuotesAdminClient from '@/components/studio/QuotesAdminClient'
@@ -43,7 +44,7 @@ export default async function AdminQuotesPage() {
             {loadError}
           </p>
         ) : (
-          <QuotesAdminClient initialItems={items} />
+          <QuotesAdminClient initialItems={items} form={mergeQuoteFormSettings(config)} />
         )}
       </main>
     </AdminEditorShell>
